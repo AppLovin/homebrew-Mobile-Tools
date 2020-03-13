@@ -6,10 +6,10 @@ class Debugapk < Formula
   homepage "https://github.com/AppLovin/homebrew-Mobile-Tools"
 
   # URL for downloading debugapk
-  url "https://github.com/AppLovin/homebrew-Mobile-Tools/archive/v1.0.0.tar.gz"
+  url "https://github.com/AppLovin/homebrew-Mobile-Tools/archive/v1.0.tar.gz"
 
   # Version
-  version "1.0.0"
+  version "1.0"
 
   # Commands
   def install
