@@ -11,9 +11,6 @@ class Debugapk < Formula
   # Version
   version "1.0.0"
 
-  # Sha256 Key
-  sha256 "f32f518c180cae5a3c6eed3a613bab15a3f79589af7602f3cd4b2487d15eb646"
-
   # Commands
   def install
       bin.install "debugapk"
