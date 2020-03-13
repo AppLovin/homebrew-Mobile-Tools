@@ -28,9 +28,9 @@ brew upgrade <formula>
 
 Create a script and remove any file extension from the name (ie. `debugapk.sh` -> `debugapk`).
 
-Add the script to the `Tools` directory.
+Add the script to the `homebrew-Mobile-Tools` directory (cannot be nested in another directory).
 
-Create a new homebrew formula following the template below and add it to the `Formulae` directory.
+Create a new homebrew formula following the template below and add it to the `Formula` directory.
 
 ```rb
 class Toolname < Formula
