@@ -1,0 +1,192 @@
+#!/bin/sh
+#
+#  debugapk.sh
+#
+#  Created by Andrew Tian on 2/25/19.
+#  Copyright © 2020 AppLovin Corporation. All rights reserved.
+#
+#  This script is used to make an APK debuggable and usable with Charles.
+#  It will inject a new network_security_config.xml, update the Android Manifest with:
+#
+#    android:debuggable="true"
+#    android:name="applovin.sdk.verbose_logging" android:value="true"
+#
+#  and rebuild and resign the provided APK, placing it in a build directory.
+#
+#  Steps:
+#    1. Install Apktool if not already installed - https://ibotpeaches.github.io/Apktool/install
+#    2. Make sure the APK, and this script are in the same working directory.
+#    3. Run the following command from the terminal in the working directory:
+#
+#         ./debugapk.sh <APK file name>
+#
+#    4. Run the following command to install the rebuilt APK (delete previously installed APK).
+#
+#         adb install build/<APK file name>
+
+# Exit script after any errors
+set -e
+
+usage() {
+    echo "Usage: ./debugapk.sh [-i APK file name] [-o open]"
+    echo "    -i    Input APK file name"
+    echo "    -o    Open the build directory when finished"
+}
+
+# Replace a specific line in a file given extended regex expressions to find and replace text
+# Argument $1 is the regular expression to replace
+# Argument $2 is the regular expression of the new line to use
+# Argument $3 is the file to use
+replace_line_in_file() {
+    REGEX_TO_REPLACE="$1"
+    REGEX_TO_USE="$2"
+    FILE="$3"
+
+    # 'e' defines Perl code to execute
+    # 'p' is a loop that prints every line, so our end result will be in standard output.
+    # 'i' means we will edit the file in place.
+    # s in the first argument means `substitute`
+    perl -pi -e "s|$REGEX_TO_REPLACE|$REGEX_TO_USE|" "$FILE"
+}
+
+while getopts "i:oh" opt; do
+    case $opt in
+    i) # -i input
+        readonly APK_INPUT=$2
+        ;;
+    o) # -o open
+        readonly OPEN_FLAG=true
+        ;;
+    h | *) # others - print usage.
+        usage
+        exit 1
+        ;;
+    esac
+done
+
+shift $((OPTIND-1))
+
+# Check for APK file name argument
+if [ -z "$APK_INPUT" ]; then
+    echo "No APK file input"
+    exit 1
+fi
+
+# Set the debug keystore
+if [ ! -f ~/.android/debug.keystore ]; then
+    # Create ~/.android directory if it does not exist
+    if [ ! -d ~/.android ]; then
+        mkdir ~/.android
+    fi
+
+    # Generate a keystore and self-signed certificate:
+    echo "No debug keystore found, creating a new one..."
+    #   -v:         verbose mode enabled
+    #   -keystore:  storage path
+    #   -storepass: keystore password
+    #   -alias:     unique alias
+    #   -keypass:   key password
+    #   -keyalg:    algorithm
+    #   -keysize:   key size
+    #   -validity:  validity in days
+    keytool -genkey \
+        -v \
+        -keystore ~/.android/debug.keystore \
+        -storepass android \
+        -alias androiddebugkey \
+        -keypass android \
+        -keyalg RSA \
+        -keysize 2048 \
+        -validity 10000
+fi
+
+DEBUG_KEYSTORE=~/.android/debug.keystore
+
+# Strip APK file name of any extension
+readonly FULL_APK_FILE_NAME=$(basename "$APK_INPUT")
+readonly APK_FILE_NAME="${FULL_APK_FILE_NAME%.*}"
+
+# Create new file name and directory for modified APK
+readonly NEW_EXTENSION="_new.apk"
+readonly OUTPUT_APK_FILE_NAME=$APK_FILE_NAME$NEW_EXTENSION
+readonly OUTPUT_DIRECTORY=/tmp/$APK_FILE_NAME
+
+# Check that apktool is installed
+command -v apktool >/dev/null 2>&1 || {
+    echo >&2 "Apktool is not installed"
+    exit 1
+}
+
+# Decode the APK
+echo "Decoding APK..."
+readonly SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+apktool d -f -o "$OUTPUT_DIRECTORY" "$APK_INPUT"
+
+# Create /res/xml directory for the APK
+if [ ! -d "$OUTPUT_DIRECTORY/res/xml" ]; then
+    mkdir "$OUTPUT_DIRECTORY"/res/xml
+fi
+
+# Copy the SDK Test App network_security_config.xml to the output directory
+# NOTE: The network_security_config.xml location may need to be updated according to your local directory structure
+readonly SDK_TEST_APP_NETWORK_SECURITY_CONFIG=~/AppLovin/SDK-Android/Android-SDK-TestApp/src/main/res/xml/network_security_config.xml
+cp "$SDK_TEST_APP_NETWORK_SECURITY_CONFIG" "$OUTPUT_DIRECTORY"/res/xml/.
+
+# Set networkSecurityConfig in the Android Manifest
+if ! grep -q "networkSecurityConfig" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
+    replace_line_in_file "s/(<application.*)(>)/\1 android\:networkSecurityConfig=\"@xml\/network_security_config\" \2 /" "$OUTPUT_DIRECTORY"/AndroidManifest.xml
+fi
+
+# Set debuggable in the Android Manifest
+if ! grep -q "debuggable" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
+    replace_line_in_file "s/(<application.*)(>)/\1 android\:debuggable=\"true\" \2 /" "$OUTPUT_DIRECTORY"/AndroidManifest.xml
+fi
+
+# Set verbose logging in the Android Manifest
+if ! grep -q "verbose_logging" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
+    replace_line_in_file "s/(<application.*>)/\1 <meta-data android\:name=\"applovin.sdk.verbose_logging\" android:value=\"true\" \/\> /" "$OUTPUT_DIRECTORY"/AndroidManifest.xml
+fi
+
+# Empty out internal frameworks in the output directory by force deleting the output directory
+apktool empty-framework-dir --force "$OUTPUT_DIRECTORY"
+
+# Build the APK
+echo "Building $OUTPUT_APK_FILE_NAME..."
+apktool b --output ./"$OUTPUT_APK_FILE_NAME" "$OUTPUT_DIRECTORY"
+
+# Get latest build tools
+BUILD_TOOLS_DIR=~/Library/Android/sdk/build-tools/
+BUILD_TOOLS_VERSION=$(ls $BUILD_TOOLS_DIR | tail -n 1)
+BUILD_TOOLS_DIR="${BUILD_TOOLS_DIR}${BUILD_TOOLS_VERSION}"
+
+# Sign the APK
+echo "Signing $OUTPUT_APK_FILE_NAME..."
+#   -ks:           keystore
+#   -ks-key-alias: unique alias
+#   -ks-pass:      keystore password
+#   -key-pass:     key password
+#   -./:           file to sign
+"$BUILD_TOOLS_DIR"/apksigner sign \
+    --ks $DEBUG_KEYSTORE \
+    --ks-key-alias androiddebugkey \
+    --ks-pass pass:android \
+    --key-pass pass:android \
+    ./"$OUTPUT_APK_FILE_NAME"
+
+# Create build directory for the new APK
+if [ ! -d "build" ]; then
+    mkdir build
+fi
+
+# Move new APK to build directory
+mv "$OUTPUT_APK_FILE_NAME" build/"$OUTPUT_APK_FILE_NAME"
+
+# Optional flag to open the build folder in finder when complete
+if [ "$OPEN_FLAG" = true ]; then
+    open ./build
+fi
+
+echo "Finished creating $OUTPUT_APK_FILE_NAME."
+echo "Please check the build directory."
+echo "To install the APK: adb install build/$OUTPUT_APK_FILE_NAME"
+exit 0
