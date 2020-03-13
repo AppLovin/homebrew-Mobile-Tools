@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#  debugapk.sh
+#  debugapk
 #
 #  Created by Andrew Tian on 2/25/19.
 #  Copyright © 2020 AppLovin Corporation. All rights reserved.
@@ -14,13 +14,13 @@
 #  and rebuild and resign the provided APK, placing it in a build directory.
 #
 #  Steps:
-#    1. Install Apktool if not already installed - https://ibotpeaches.github.io/Apktool/install
-#    2. Make sure the APK, and this script are in the same working directory.
-#    3. Run the following command from the terminal in the working directory:
+#    1. Install apktool if not already installed - https://ibotpeaches.github.io/Apktool/install
+#    2. Install this tool via homebrew - https://github.com/AppLovin/homebrew-Mobile-Tools/blob/master/README.md
+#    3. Run the following command from the terminal in the working directory containing the APK:
 #
-#         ./debugapk.sh <APK file name>
+#         debugapk -i <APK file name> -o
 #
-#    4. Run the following command to install the rebuilt APK (delete previously installed APK).
+#    4. Run the following command to install the rebuilt APK (delete device's previously installed APK).
 #
 #         adb install build/<APK file name>
 
@@ -28,7 +28,7 @@
 set -e
 
 usage() {
-    echo "Usage: ./debugapk.sh [-i APK file name] [-o open]"
+    echo "Usage: debugapk [-i input APK file name] [-o open]"
     echo "    -i    Input APK file name"
     echo "    -o    Open the build directory when finished"
 }
