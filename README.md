@@ -41,10 +41,10 @@ class Toolname < Formula
   homepage "https://github.com/AppLovin/homebrew-Mobile-Tools"
 
   # Create a release for the tool, then copy the tar link and paste it here
-  url "https://github.com/AppLovin/homebrew-Mobile-Tools/archive/v1.0.0.tar.gz"
+  url "https://github.com/AppLovin/homebrew-Mobile-Tools/archive/v1.0.tar.gz"
 
   # Update the tool version here
-  version "1.0.0"
+  version "1.0"
 
   # Commands
   # This installs the tool in your user bin: /usr/local/bin/toolname
