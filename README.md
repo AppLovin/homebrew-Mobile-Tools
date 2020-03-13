@@ -4,6 +4,8 @@ This repository contains the AppLovin Mobile team's homebrew installable tools.
 
 ## Installation
 
+Note: If your macOS version is below Catalina (10.15), you may be prompted to install xcode command line tools.
+
 Tap into the repository with:
 
 ```bash
