@@ -6,7 +6,10 @@ class Debugapk < Formula
   homepage "https://github.com/AppLovin/homebrew-Mobile-Tools"
 
   # URL for downloading debugapk
-  url "https://github.com/AppLovin/homebrew-Mobile-Tools/archive/v1.0.tar.gz", :using => GitHubPrivateRepositoryReleaseDownloadStrategy
+  url "https://github.com/AppLovin/homebrew-Mobile-Tools/archive/v1.0.tar.gz"
+
+  # Allows installation from a private repository
+  download_strategy: GitHubPrivateRepositoryReleaseDownloadStrategy
 
   # Version
   version "1.0"
