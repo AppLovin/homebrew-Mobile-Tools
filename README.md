@@ -2,7 +2,7 @@
 
 This repository contains the AppLovin Mobile team's homebrew installable tools.
 
-## How To Install
+## Installation
 
 Tap into the repository with:
 
@@ -16,9 +16,19 @@ Then install any tools with:
 brew install <formula>
 ```
 
+## Updating
+
+Update a specific tool with:
+
+```bash
+brew upgrade <formula>
+```
+
 ## How To Add Tools
 
-Create a script and remove any file extension from the name (ie. `debugapk.sh` -> `debugapk`). Then add it to the `Tools` directory.
+Create a script and remove any file extension from the name (ie. `debugapk.sh` -> `debugapk`).
+
+Add the script to the `Tools` directory.
 
 Create a new homebrew formula following the template below and add it to the `Formulae` directory.
 
@@ -30,7 +40,7 @@ class Toolname < Formula
   # Homepage
   homepage "https://github.com/AppLovin/homebrew-Mobile-Tools"
 
-  # Create a release for your tool, then copy the tar link and paste it here
+  # Create a release for the tool, then copy the tar link and paste it here
   url "https://github.com/AppLovin/homebrew-Mobile-Tools/archive/v1.0.0.tar.gz"
 
   # Update the tool version here
@@ -44,14 +54,12 @@ class Toolname < Formula
 end
 ```
 
-Now the tool should be good to go. Tap into the repository:
+Tap into the repository and install the tool.
 
-```bash
-brew tap AppLovin/homebrew-Mobile-Tools
-```
+## How To Update Tools
 
-Then install the tool with:
+After making changes to a tool, create a new release for the tool.
 
-```bash
-brew install <formula>
-```
+Update the `url` in the tool's associated formula with the new release tar link and the `version` as well.
+
+Tap into the repository and install or upgrade the tool.
