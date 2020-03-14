@@ -14,15 +14,27 @@
 #  and rebuild and resign the provided APK, placing it in a build directory.
 #
 #  Steps:
-#    1. Install apktool if not already installed - https://ibotpeaches.github.io/Apktool/install
-#    2. Install this tool via homebrew - https://github.com/AppLovin/homebrew-Mobile-Tools/blob/master/README.md
-#    3. Run the following command from the terminal in the working directory containing the APK:
+#  1. Install apktool if not already installed (brew is recommended) - <https://ibotpeaches.github.io/Apktool/install>
 #
-#         debugapk -i <APK file name> -o
+#     `brew install apktool`
 #
-#    4. Run the following command to install the rebuilt APK (delete device's previously installed APK).
+#  2. Check and ensure your `apktool` version is `2.4.1` or higher with:
 #
-#         adb install build/<APK file name>
+#     `apktool -version`
+#
+#  3. Tap into this repository and install this tool:
+#
+#     `brew tap AppLovin/homebrew-Mobile-Tools`
+#
+#     `brew install debugapk`
+#
+#  4. Run the following command from the terminal in the working directory containing the APK:
+#
+#     `debugapk -i <APK file name> -o`
+#
+#  5. Run the following command to install the rebuilt APK (delete device's previously installed APK).
+#
+#     `adb install build/<APK file name>`
 
 # Exit script after any errors
 set -e
@@ -107,7 +119,7 @@ readonly FULL_APK_FILE_NAME=$(basename "$APK_INPUT")
 readonly APK_FILE_NAME="${FULL_APK_FILE_NAME%.*}"
 
 # Create new file name and directory for modified APK
-readonly NEW_EXTENSION="_new.apk"
+readonly NEW_EXTENSION="_debuggable.apk"
 readonly OUTPUT_APK_FILE_NAME=$APK_FILE_NAME$NEW_EXTENSION
 readonly OUTPUT_DIRECTORY=/tmp/$APK_FILE_NAME
 
@@ -189,4 +201,5 @@ fi
 echo "Finished creating $OUTPUT_APK_FILE_NAME."
 echo "Please check the build directory."
 echo "To install the APK: adb install build/$OUTPUT_APK_FILE_NAME"
+echo "If the install fails with a verification failure please check that the Verify apps over USB setting is disabled in Developer options."
 exit 0
