@@ -56,7 +56,7 @@ class Toolname < Formula
 end
 ```
 
-Tap into the repository and install the tool. 
+Tap into the repository and install the tool.
 
 Add a new section to this `README.md` to help users install and use the new tool.
 
