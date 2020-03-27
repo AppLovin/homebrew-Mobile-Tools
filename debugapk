@@ -45,22 +45,6 @@ usage() {
     echo "    -o    Open the build directory when finished"
 }
 
-# Replace a specific line in a file given extended regex expressions to find and replace text
-# Argument $1 is the regular expression to replace
-# Argument $2 is the regular expression of the new line to use
-# Argument $3 is the file to use
-replace_line_in_file() {
-    REGEX_TO_REPLACE="$1"
-    REGEX_TO_USE="$2"
-    FILE="$3"
-
-    # 'e' defines Perl code to execute
-    # 'p' is a loop that prints every line, so our end result will be in standard output.
-    # 'i' means we will edit the file in place.
-    # s in the first argument means `substitute`
-    perl -pi -e "s|$REGEX_TO_REPLACE|$REGEX_TO_USE|" "$FILE"
-}
-
 while getopts "i:oh" opt; do
     case $opt in
     i) # -i input
@@ -142,21 +126,24 @@ fi
 # Copy the SDK Test App network_security_config.xml to the output directory
 # NOTE: The network_security_config.xml location may need to be updated according to your local directory structure
 readonly SDK_TEST_APP_NETWORK_SECURITY_CONFIG=~/AppLovin/SDK-Android/Android-SDK-TestApp/src/main/res/xml/network_security_config.xml
-cp "$SDK_TEST_APP_NETWORK_SECURITY_CONFIG" "$OUTPUT_DIRECTORY"/res/xml/.
+cp "$SDK_TEST_APP_NETWORK_SECURITY_CONFIG" "$OUTPUT_DIRECTORY"/res/xml
 
 # Set networkSecurityConfig in the Android Manifest
-if ! grep -q "networkSecurityConfig" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
-    replace_line_in_file "s/(<application.*)(>)/\1 android\:networkSecurityConfig=\"@xml\/network_security_config\" \2 /" "$OUTPUT_DIRECTORY"/AndroidManifest.xml
+if ! grep "networkSecurityConfig" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
+    sed -E "s/(<application.*)(>)/\1 android\:networkSecurityConfig=\"@xml\/network_security_config\" \2 /" $OUTPUT_DIRECTORY/AndroidManifest.xml > $OUTPUT_DIRECTORY/AndroidManifest.xml.tmp
+    mv $OUTPUT_DIRECTORY/AndroidManifest.xml.tmp $OUTPUT_DIRECTORY/AndroidManifest.xml
 fi
 
 # Set debuggable in the Android Manifest
-if ! grep -q "debuggable" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
-    replace_line_in_file "s/(<application.*)(>)/\1 android\:debuggable=\"true\" \2 /" "$OUTPUT_DIRECTORY"/AndroidManifest.xml
+if ! grep "debuggable" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
+    sed -E "s/(<application.*)(>)/\1 android\:debuggable=\"true\" \2 /" $OUTPUT_DIRECTORY/AndroidManifest.xml > $OUTPUT_DIRECTORY/AndroidManifest.xml.tmp
+    mv $OUTPUT_DIRECTORY/AndroidManifest.xml.tmp $OUTPUT_DIRECTORY/AndroidManifest.xml
 fi
 
 # Set verbose logging in the Android Manifest
 if ! grep -q "verbose_logging" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
-    replace_line_in_file "s/(<application.*>)/\1 <meta-data android\:name=\"applovin.sdk.verbose_logging\" android:value=\"true\" \/\> /" "$OUTPUT_DIRECTORY"/AndroidManifest.xml
+    sed -E "s/(<application.*>)/\1 <meta-data android\:name=\"applovin.sdk.verbose_logging\" android:value=\"true\" \/\> /" $OUTPUT_DIRECTORY/AndroidManifest.xml > $OUTPUT_DIRECTORY/AndroidManifest.xml.tmp
+    mv $OUTPUT_DIRECTORY/AndroidManifest.xml.tmp $OUTPUT_DIRECTORY/AndroidManifest.xml
 fi
 
 # Empty out internal frameworks in the output directory by force deleting the output directory
