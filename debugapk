@@ -135,9 +135,10 @@ if ! grep "networkSecurityConfig" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
 fi
 
 # Set debuggable in the Android Manifest
-if ! grep "debuggable" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
-    sed -E "s/(<application.*)(>)/\1 android\:debuggable=\"true\" \2 /" $OUTPUT_DIRECTORY/AndroidManifest.xml > $OUTPUT_DIRECTORY/AndroidManifest.xml.tmp
-    mv $OUTPUT_DIRECTORY/AndroidManifest.xml.tmp $OUTPUT_DIRECTORY/AndroidManifest.xml
+if grep -i "debuggable=\"false\"" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
+    sed -i "" "s|android:debuggable=\"false\"|android:debuggable=\"true\"|g" "$OUTPUT_DIRECTORY"/AndroidManifest.xml
+elif ! grep -i "debuggable" "$OUTPUT_DIRECTORY"/AndroidManifest.xml; then
+    sed -i "" "s/(<application.*)(>)/\1 android\:debuggable=\"true\" \2 /" $OUTPUT_DIRECTORY/AndroidManifest.xml
 fi
 
 # Set verbose logging in the Android Manifest
