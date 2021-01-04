@@ -1,0 +1,12 @@
+class Aldroid < Formula
+    version "0.1.0"
+
+    desc "This tool transforms Android APKs to make them debuggable and MITMable/Charlesable"
+    homepage "https://github.com/AppLovin/homebrew-Mobile-Tools"
+    url "https://github.com/AppLovin/homebrew-Mobile-Tools/archive/v#{version}.tar.gz"
+
+    def install
+        bin.install "aldroid"
+        bin.install "aldroid-running-app"
+    end
+end

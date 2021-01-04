@@ -1,0 +1,754 @@
+#!/bin/sh
+#
+# aldroid.sh
+#
+# This script is used to make APKs debuggable locally or pull an app, make it debuggable and push it pack to the device or pull/push files to an Android device.
+#
+# Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
+#
+
+VERSION=0.1.0
+
+usage() {
+    cat <<EOF
+usage: aldroid
+  -h             Prints this information.
+  -v             Prints version information.
+
+usage: aldroid d[ebuggable] [options] <package_name>
+Pulls the app, makes it debuggable and charlesable and reinstalls it. Will also handle obbs.
+  --use-aapt2    Rebuild with aapt2.
+
+usage: aldroid d[ebuggable] [options] --apk <apk_file> [splits]
+Make an apk or a split apk debuggable and charlesable. Saves all inputs as <input>_debuggable.apk
+  -o <output_directory> The directory to save the apks to.
+  --use-aapt2    Rebuild with aapt2.
+  --split        Indicates that this is a split apk and a list of splits follow the options.
+  -i|--install   Install the apks after making them debuggable.
+
+usage: aldroid pull [options] <package_name>
+Pull files for given package name.
+  -o <output_directory> Directory in which to store the files. Defaults to /tmp/<package_name>
+  --apk          Pull apk(s).
+  --obb          Pull obb(s).
+EOF
+}
+
+# Check if debug keystore exists, otherwise create one
+check_keystore() {
+    if [ ! -f ~/.android/debug.keystore ]; then
+        # Create ~/.android directory if it does not exist
+        if [ ! -d ~/.android ]; then
+            mkdir ~/.android
+        fi
+
+        # Generate a keystore and self-signed certificate:
+        echo "No debug keystore found, creating a new one..."
+        #   -v:         verbose mode enabled
+        #   -keystore:  storage path
+        #   -storepass: keystore password
+        #   -alias:     unique alias
+        #   -keypass:   key password
+        #   -keyalg:    algorithm
+        #   -keysize:   key size
+        #   -validity:  validity in days
+        keytool -genkey \
+            -v \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
+    fi
+}
+
+# Check if apktool exists in path.
+check_apktool() {
+    command -v apktool >/dev/null 2>&1 || {
+        echo >&2 "ERROR: Apktool is not installed!"
+        exit 1
+    }
+}
+
+# Decompile an apk with apktool.
+# First argument is the APK to decompile.
+# Second argument is optional and defines the path to the output folder (content will be overwritten if it exists). Defaults to /tmp/<apk_name_without_extensions>.
+decompile_apk() {
+    local APK_IN=$1
+    if [ -z "$APK_IN" ]; then
+        echo >&2 "ERROR: No APK file specified to decompile!"
+        exit 1
+    fi
+
+    # Strip APK file name of any extension
+    local -r APK_NAME_WITH_EXT=$(basename "$APK_IN")
+    local -r APK_NAME="${APK_NAME_WITH_EXT%.*}"
+
+    local -r OUTPUT_DIRECTORY=${2:-/tmp/$APK_NAME}
+    echo "Decompiling into $OUTPUT_DIRECTORY..."
+
+    # Check that apktool is installed
+    check_apktool
+
+    # Decompiles the apk.
+    # -f: overwrite output directory
+    # -s: skips source decompilation which is faster and source access is not required in 99% of cases
+    # -o: explicitly set output directory
+    apktool d -f -s -o "$OUTPUT_DIRECTORY" "$APK_IN"
+
+    echo "Finished decompiling into ${OUTPUT_DIRECTORY}."
+
+    return 0
+}
+
+# Rebuild an apk with apktool.
+# First argument is the folder to rebuild.
+compile_apk() {
+    local APK_IN=$1
+
+    # TODO: check that input path exists
+    # Check that apktool is installed
+    check_apktool
+
+    # Empty out internal frameworks in the output directory by force deleting the output directory
+    apktool empty-framework-dir --force "$APK_IN"
+
+    # Rebuild the apk. Reads $USE_AAPT2 which is set when this script is run with the --use-aapt2 flag.
+    # -f:          overwrite output APK if it already exists
+    # --use-aapt2: Use the newer aapt2 to recompile resources. Sometimes required.
+    # Will always output to APK_IN/dist/base.apk
+    apktool b -f $USE_AAPT2 "$APK_IN"
+
+    return 0
+}
+
+# Aligns and signs an APK.
+# First argument is the APK to resign.
+# Second argument is the output path for the resigned APK.
+sign_apk() {
+    local APK_IN=$1
+
+    # TODO: provide default for APK_OUT
+    local APK_OUT=$2
+
+    # Make sure the keystore exists
+    check_keystore
+    local debug_keystore=~/.android/debug.keystore
+
+    # Realigns APK so it can be signed.
+    echo "Aligning $APK_IN to $APK_OUT..."
+    # -f: overwrite output path if it exists
+    #  4: defines byte-alignment boundaries; must be 4
+    zipalign -f 4 "$APK_IN" "$APK_OUT"
+
+    # Signs the APK
+    echo "Signing $APK_OUT..."
+    apksigner sign \
+    --ks "$debug_keystore" \
+    --ks-key-alias androiddebugkey \
+    --ks-pass pass:android \
+    --key-pass pass:android \
+    "$APK_OUT"
+}
+
+# Pull all APKs for a package name. Saves an array with all pulled APK names to PULLED_APKS.
+# First argument is the package name for which to pull the APKs.
+# Second optional argument is the folder to save the APKs in. Defaults to /tmp/<package_name>.
+pull_apks() {
+    PULLED_APKS=()
+    local PACKAGE_NAME=$1
+    local OUTPUT_DIRECTORY=${2:-/tmp/$PACKAGE_NAME}
+
+    echo "Pulling APK(s) for $PACKAGE_NAME into ${OUTPUT_DIRECTORY}..."
+
+    # Ignore errors since our command is not guaranteed to succeed.
+    set +e
+
+    # Gets a list of associated paths with the package name from pm (package manager). Packages are separated by newlines.
+    local apks;
+    apks=$(adb shell pm path $PACKAGE_NAME)
+
+    # Exit on any errors
+    set -e
+
+    # No APK found for package name
+    if [[ -z $apks ]]; then
+      echo "No APKs found for package name $PACKAGE_NAME. Aborting..."
+      return 1
+    fi
+    echo running
+    # Create output directory if it does not exist.
+    if [ ! -d "$OUTPUT_DIRECTORY" ]; then
+        mkdir "$OUTPUT_DIRECTORY"
+    fi
+
+    # Iterate over the list
+    while IFS= read -r line; do
+        # Each line is 'package:' followed by the absolute path to an APK.
+        # Remove first 8 characters (package:) from start of line.
+        local APK_REMOTE_PATH="${line:8}"
+
+        # Pull APK from device and save it in the output directory.
+        adb pull "$APK_REMOTE_PATH" "$OUTPUT_DIRECTORY"
+        echo "Pulled ${APK_REMOTE_PATH##*/} to $OUTPUT_DIRECTORY/${APK_REMOTE_PATH##*/}"
+
+        # Add the saved APKs filename to the array
+        #TODO split into 2 lines for better readability
+        PULLED_APKS+=("$(basename "$APK_REMOTE_PATH")")
+    done <<< "$apks"
+
+    if [[ ${#PULLED_APKS[@]} -eq 0 ]]; then
+      echo "No APKs pulled package name $PACKAGE_NAME. Aborting..."
+      return 1
+    fi
+
+    return 0
+}
+
+# Updates a decompiled APK to make it debuggable and charlesable by adding android:debuggable="true" and updating/creating a network_security_config.xml
+# The first argument is the path to the decompiled APK.
+make_decompiled_debuggable() {
+    local INPUT_DIRECTORY=$1
+
+    # Create /res/xml directory for the APK if it does not exist.
+    if [ ! -d "$INPUT_DIRECTORY/res/xml" ]; then
+        mkdir "$INPUT_DIRECTORY/res/xml"
+    fi
+
+
+    local USES_CLEARTEXT_TRAFFIC=false
+
+    # Check for usesCleartextTraffic in the Android Manifest
+    if grep "android:usesCleartextTraffic=\"true\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+        USES_CLEARTEXT_TRAFFIC=true
+    fi
+
+    # Create network_security_config.xml or update it
+
+    # If the network_security_config.xml does not exist
+    if [ ! -f "$INPUT_DIRECTORY/res/xml/network_security_config.xml" ]; then
+        # android:usesCleartextTraffic="true" allows cleartext traffic in the whole app but it is ignored when we add the network_security_config.xml
+        # If that option is set add corresponding network_security_config.xml
+        if grep "android:usesCleartextTraffic=\"true\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+            # android:usesCleartextTraffic not true or not set
+            # Create a new network_security_config.xml including only the debug override so we don't accidentally fix cleartext issues.
+            cat > "$INPUT_DIRECTORY/res/xml/network_security_config.xml" << EOM
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+    </base-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>
+EOM
+        else
+            # android:usesCleartextTraffic not true or not set
+            # Create a new network_security_config.xml including only the debug override so we don't accidentally fix cleartext issues.
+            cat > "$INPUT_DIRECTORY/res/xml/network_security_config.xml" << EOM
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>
+EOM
+        fi
+
+    # If the network_security_config.xml already exists and does not contain debug-overrides
+    # TODO: technically there could be a case where the pub has overrides that do not include user certs, we should guard against that
+elif ! grep "debug-overrides" "$INPUT_DIRECTORY/res/xml/network_security_config.xml"; then
+        # Add debug-overrides to trust user certs.
+        # New lines are escaped for better readability
+        sed -E "s/<\/network-security-config>/\
+<debug-overrides>\
+    <trust-anchors>\
+        <certificates src=\"user\" \/>\
+    <\/trust-anchors>\
+<\/debug-overrides>\
+<\/network-security-config>/" "$INPUT_DIRECTORY/res/xml/network_security_config.xml" > "$INPUT_DIRECTORY/res/xml/network_security_config.xml.tmp"
+        mv "$INPUT_DIRECTORY/res/xml/network_security_config.xml.tmp" "$INPUT_DIRECTORY/res/xml/network_security_config.xml"
+    fi
+
+    # Set networkSecurityConfig in the Android Manifest if it is not in the application tag
+    if ! grep -E "<application.*?networkSecurityConfig.*?>" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+        sed -E "s/(<application.*)(>)/\1 android\:networkSecurityConfig=\"@xml\/network_security_config\" \2 /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
+        mv "$INPUT_DIRECTORY/AndroidManifest.xml.tmp" "$INPUT_DIRECTORY/AndroidManifest.xml"
+    fi
+
+    # Set debuggable in the Android Manifest
+    # TODO: make sure it's correctly inside the application tag
+    if grep -i "debuggable=\"false\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+        sed -i "" "s|android:debuggable=\"false\"|android:debuggable=\"true\"|g" "$INPUT_DIRECTORY/AndroidManifest.xml"
+    elif ! grep -i "debuggable" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+        sed -E "s/(<application.*)(>)/\1 android\:debuggable=\"true\" \2 /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
+        mv "$INPUT_DIRECTORY/AndroidManifest.xml.tmp" "$INPUT_DIRECTORY/AndroidManifest.xml"
+    fi
+
+    # Set extractNativeLibs in the Android Manifest. Otherwise the app might crash when starting it on the device.
+    # TODO: make sure it's correctly inside the application tag
+    if grep -i "extractNativeLibs=\"false\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+        sed -i "" "s|android:extractNativeLibs=\"false\"|android:extractNativeLibs=\"true\"|g" "$INPUT_DIRECTORY/AndroidManifest.xml"
+    fi
+
+    return 0
+}
+
+# Takes an apk and makes it debuggable and charlesable.
+# The first argument is the APK file to make debuggable.
+# The second optional argument is the output file path for the debuggable APK. Defaults to <APK_IN>_debuggable.apk
+make_apk_debuggable() {
+    local -r APK_IN=$1
+    echo "Transforming $APK_IN to make it debuggable..."
+
+    # Get filename without extensions
+    local -r APK_NAME_WITH_EXT=$(basename "$APK_IN")
+    local -r APK_NAME="${APK_NAME_WITH_EXT%.*}"
+
+    # By default, output to /path/to/<APK_IN>_debuggable.apk
+    local -r APK_OUT=${2-${APK_IN%\.apk}_debuggable.apk}
+    echo "Saving output apk in ${APK_OUT}."
+
+    # Make sure we decompile in /tmp so we don't create unnecessary folders
+    local DECOMPIILE_DIRECTORY=${APK_IN%\.apk}
+    if [[ "$APK_IN" != \/tmp\/* ]]; then
+        DECOMPIILE_DIRECTORY="/tmp/${APK_NAME}"
+    fi
+
+    # Decompile the APK.
+    decompile_apk "$APK_IN" "$DECOMPIILE_DIRECTORY"
+
+    # Extract package name for later use
+    extract_package_name_from_manifest "$DECOMPIILE_DIRECTORY/AndroidManifest.xml"
+
+    # Make it debuggable and charlesable.
+    make_decompiled_debuggable "$DECOMPIILE_DIRECTORY"
+    # Rebuild it.
+    compile_apk "$DECOMPIILE_DIRECTORY"
+
+    # Align and sign it.
+    sign_apk "${DECOMPIILE_DIRECTORY}/dist/${APK_NAME}.apk" "$APK_OUT"
+}
+
+# Install an APK or multiple APKs to a device with adb install / adb install-multiple
+# Takes a list of APKs to install as arguments.
+install_apks() {
+    # TODO check for arguments
+
+    local APKS=("$@")
+
+    # Determine whether we have more then one APK and run adb install-multiple in that case
+    local cmd="adb install"
+    if [ ${#APKS[@]} -gt 1 ]; then
+        cmd="adb install-multiple"
+    fi
+
+    # Install it on the device.
+    echo "Installing the following APK(s): ${APKS[@]}..."
+    $cmd ${APKS[@]}
+}
+
+# Uninstalls a package from a device.
+# The first argument is the package name to uninstall
+uninstall_package() {
+    # TODO check for arguments
+
+    echo "Uninstalling $1..."
+    adb uninstall $1
+}
+
+# Pulls all apks for a package name, makes them debuggable and reinstalls them.
+# The first argument is the package name of the app.
+make_apk_debuggable_from_device() {
+    local -r PACKAGE_NAME=$1
+    local -r OUTPUT_DIRECTORY="/tmp/${PACKAGE_NAME}"
+
+    echo "Making app $PACKAGE_NAME debuggable..."
+    echo "Storing files in $OUTPUT_DIRECTORY"
+
+    # Pull all APKs
+    pull_apks "$PACKAGE_NAME" "$OUTPUT_DIRECTORY"
+
+    # Pull all OBBs
+    pull_obbs "$PACKAGE_NAME"
+
+
+    local INDEX=1
+    local APKS=()
+
+    # Iterate over pulled APKs
+    for APK in "${PULLED_APKS[@]}"
+    do
+        # Ignore empty or whitespace entries.
+        if [ -z "${APK// }" ]; then
+            continue
+        fi
+
+        echo "Transforming $APK..."
+        if [[ "$APK" == "base.apk" ]]; then
+            # Base APK must be transformed to make it debuggable.
+            make_apk_debuggable "${OUTPUT_DIRECTORY}/${APK}" "${OUTPUT_DIRECTORY}/0.apk"
+            # Save as 0.apk and add it to index 0 in the array.
+            APKS[0]="${OUTPUT_DIRECTORY}/0.apk"
+        else
+            # Split APKs just need to be resigned so the signature matches the base.apk.
+            sign_apk "${OUTPUT_DIRECTORY}/${APK}" "${OUTPUT_DIRECTORY}/${INDEX}.apk"
+            # We number the starting at 1 so the base is always at the start of the array.
+            APKS[INDEX]="${OUTPUT_DIRECTORY}/${INDEX}.apk"
+            ((INDEX++))
+        fi
+    done
+
+    # Uninstall the app as we likely have a different signature now so reinstalling would throw an error.
+    uninstall_package "$PACKAGE_NAME"
+
+    # Install our new APK(s)
+    install_apks "${APKS[@]}"
+
+    # Push back any OBBs we pulled so the game will run.
+    push_obbs "$PACKAGE_NAME"
+
+    start_app "$PACKAGE_NAME"
+}
+
+# Pull all OBBs associated with a package name and saves them in the array OBBS.
+# First argument is the package name for which to pull OBBs.
+# Second optional argument is the output directory to save the OBBs at. Defaults to /tmp/<package name>
+pull_obbs() {
+    echo "Pulling OBB(s) for $1..."
+
+    # Verify an argument was provided.
+    if [ -z $1 ]; then
+        echo >&2 "ERROR: No package name provided to pull_obbs!"
+        exit 1
+    fi
+
+    # Going to have to save the exit code. Declaring variable before we use it since local is itself something that generates an exit code.
+    local EXIT_CODE
+    local TEMP_OBBS
+
+    # Initialize as an empty array
+    OBBS=()
+
+    # Ignore errors since our ls command is not guaranteed to succeed.
+    set +e
+
+    # OBBs are always saved at /sdcard/Android/obb/<package name> so we use ls to get a list of files there.
+    TEMP_OBBS=$(adb shell ls "/sdcard/Android/obb/$1")
+    # Save exit code so we can use it to check if it worked.
+    EXIT_CODE=$?
+
+    # Exit on any errors
+    set -e
+
+    # No OBBs found or no device connected.
+    if [[ $EXIT_CODE -ne 0 || -z $TEMP_OBBS ]]; then
+        echo 'No OBBs found on device.'
+        return 0
+    fi
+
+    # TODO technically on some devices this will return code 0 and only a newline as output.
+    # We should stop this here instead of catching it later in the loop
+
+    # Determine output directory.
+    local -r OUTPUT_DIRECTORY=${2-/tmp/$1}
+
+    # Create output directory if it does not exist.
+    if [ ! -d "$OUTPUT_DIRECTORY" ]; then
+        mkdir "$OUTPUT_DIRECTORY"
+    fi
+
+    # Iterate over all OBBs we found and pull them from the device.
+    for OBB in "$TEMP_OBBS"; do
+        # In case there are other files there make sure the obb files end in .obb
+        if [[ "${OBB: -4}" != ".obb" ]]; then
+            continue
+        fi
+
+        adb pull "/sdcard/Android/obb/$1/$OBB" "$OUTPUT_DIRECTORY/$OBB"
+        echo "Pulled $OBB into $OUTPUT_DIRECTORY/$OBB"
+        OBBS+=$OBB
+    done
+
+    return 0
+}
+
+# Pushes OBBs back to the device. Uses array stored in OBBS variable and assumes they reside in /tmp/<package name>.
+# First argument is the package name for which to push OBBs for.
+push_obbs() {
+    # Verify an argument was provided
+    if [ -z "$1" ]; then
+        echo "No package name provided to push_obbs"
+        exit 1
+    fi
+
+    echo "Pushing OBB(s)..."
+    echo "$OBBS"
+
+    # Safety for empty arrays as if it's empty we would push the entire folder
+    if [[ ${#OBBS[@]} -eq 0 ]]; then
+        echo "No OBBs to push"
+        return 0
+    fi
+
+    # Iterate all OBBs on $OBBS and push them back to the device.
+    for OBB in "$OBBS"; do
+        adb push "/tmp/$1/$OBB" "/sdcard/Android/obb/$1/$OBB"
+    done
+
+    return 0
+}
+
+# Starts an app on the device given a package name.
+# First argument is the package name to start.
+start_app() {
+    # Verify an argument was provided
+    if [ -z $1 ]; then
+        echo "No package name provided to run_app"
+        exit 1
+    fi
+
+    local PACKAGE_NAME=$1
+
+    # monkey is a tool to simulate user interaction. In this case it simulates a press on the app icon.
+    adb shell monkey -p "${PACKAGE_NAME}" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+}
+
+# Parses an AndroidManifest.xml to extract the package name.
+# First argument is the path to the AndroidManifest.xml
+# Saves package name in EXTRACTED_PACKAGE_NAME
+extract_package_name_from_manifest() {
+    # Verify an argument was provided
+    if [ -z $1 ]; then
+        echo "No argument provided to extract_package_name_from_manifest"
+        exit 1
+    fi
+
+    if [ ! -f $1 ]; then
+        echo "$1 is not a path to a valid file"
+        exit 1
+    fi
+
+    # Get AndroidManifest content
+    local MANIFEST=$(cat "$1")
+    local PACKAGE_NAME=
+
+    # The manifest will include package inside the manifest tag.
+    # ex: <manifest package="com.my.package.name">
+
+    # Trim start until package="
+    PACKAGE_NAME=${MANIFEST#*package=\"}
+    # Trim everything after first "
+    PACKAGE_NAME=${PACKAGE_NAME%%\"*}
+
+    # Check if we have a valid package name
+    # TODOTODOTODO Guess this makes no sense and we should rather check if it contains any spaces or something
+    if [[ ! -z "$PACKAGE_NAME" ]]; then
+        EXTRACTED_PACKAGE_NAME=$PACKAGE_NAME
+        echo "Extracted package name: ${PACKAGE_NAME}"
+
+    else
+        echo "Unable to determine package name."
+    fi
+}
+
+# Helper method for d[ebug] --apk to unclutter getopts.
+# Makes provided APK(s) debuggable and may install them incase -i/--install was set.
+# All splits are provided as a list of arguments.
+parse_make_apk_debuggable() {
+    local BASE_APK_OUT=
+
+    # set default output path
+    if [[ -z $OUT_OPT_ARG ]]; then
+        BASE_APK_OUT=${BASE_APK_ARG%\.apk}_debuggable.apk
+        make_apk_debuggable "$BASE_APK_ARG" "$BASE_APK_OUT"
+    else
+        # make sure directory exists
+        if [[ ! -d "$OUT_OPT_ARG" ]]; then
+            mkdir "$OUT_OPT_ARG"
+        fi
+
+        # because of --split and for consistency -o will always be a directory
+        # get output name
+        local -r BASE_APK_NAME_WITH_EXT=$(basename "$BASE_APK_ARG")
+        local -r BASE_APK_NAME=${BASE_APK_NAME_WITH_EXT%\.apk}_debuggable.apk
+        BASE_APK_OUT="${OUT_OPT_ARG}/$BASE_APK_NAME"
+
+        make_apk_debuggable "$BASE_APK_ARG" "$BASE_APK_OUT"
+    fi
+
+    # Save split locations so we can add them to the install command later.
+    SPLITS=()
+    if [[ $SPLIT_OPT_SET == true ]]; then
+        local -r OUTPUT_PATH=${OUT_OPT_ARG:-/tmp/$BASE_APK_ARG}
+        for SPLIT in "$@"
+        do
+            local -r APK_NAME_WITH_EXT=$(basename "$SPLIT")
+            local -r APK_NAME=${APK_NAME_WITH_EXT%\.apk}_debuggable.apk
+            local -r split_out_path="${OUTPUT_PATH}/${APK_NAME}"
+
+            # add split to the array
+            SPLITS+=("$split_out_path")
+
+            sign_apk "${SPLIT}" "$split_out_path"
+        done
+    fi
+
+    # Install the apks if -i/--install is set.
+    if [[ $INSTALL_OPT_SET == true ]]; then
+        # Uninstall the app
+        uninstall_package $EXTRACTED_PACKAGE_NAME
+
+        # Install the app
+        install_apks $BASE_APK_OUT "${SPLITS[@]}"
+
+        # Start the app after it has been installed
+        start_app "${EXTRACTED_PACKAGE_NAME}"
+    fi
+}
+
+# Exit script after any errors
+set -e
+
+# Global variables for return values of pull_apks and pull_obbs and extract_package_name_from_manifest
+PULLED_APKS=()
+OBBS=()
+EXTRACTED_PACKAGE_NAME=
+
+# Parse basic options
+while getopts "h?v" opt; do
+    case "$opt" in
+        v)
+            echo "$VERSION"
+            exit 0
+            ;;
+        h|\?)
+            usage
+            exit 0
+            ;;
+    esac
+done
+# End option parsing by dropping all parsed arguments.
+shift $((OPTIND-1))
+
+# Save subcommand and remove it from list of arguments.
+SUBCOMMAND=$1
+shift
+
+# Initialize option argument variables.
+BASE_APK_ARG=
+OUT_OPT_ARG=
+APK_OPT_SET=false
+OBB_OPT_SET=false
+SPLIT_OPT_SET=false
+INSTALL_OPT_SET=false
+USE_AAPT2=''
+
+# Parse options for subcommand
+while getopts "i-:o:" opt; do
+    case "$opt" in
+    h|\?)
+        usage
+        exit 0
+        ;;
+    v)
+        echo "$0 - version: $VERSION"
+        exit 0
+        ;;
+    o)
+        OUT_OPT_ARG="${OPTARG}"
+        ;;
+    i)
+        INSTALL_OPT_SET=true
+        ;;
+    -)
+        case "${OPTARG}" in
+            apk)
+                APK_OPT_SET=true
+                if [[ $SUBCOMMAND == "d" || $SUBCOMMAND == "debuggable" || $SUBCOMMAND == "install" ]]; then
+                    BASE_APK_ARG="${!OPTIND}";
+                    OPTIND=$(( $OPTIND + 1 ))
+
+                    # Exit if BASE_APK_ARG does not exist.
+                    if [[ ! -f $BASE_APK_ARG ]]; then
+                        echo "ERROR: Input APK $BASE_APK_ARG does not exist."
+                        exit 1
+                    fi
+                fi
+                ;;
+            obb)
+                OBB_OPT_SET=true
+                ;;
+            split)
+                SPLIT_OPT_SET=true
+                ;;
+            use-aapt2)
+                USE_AAPT2='--use-aapt2'
+                ;;
+            install)
+                INSTALL_OPT_SET=true
+                ;;
+            *) # others - print usage.
+                usage
+                exit 1
+                ;;
+        esac
+        ;;
+    esac
+done
+# End option parsing by dropping all parsed arguments.
+shift $((OPTIND-1))
+
+# We require a subcommand to be provided as the first argument.
+if [[ -z $SUBCOMMAND ]]; then
+    usage
+    exit 1
+fi
+
+case $SUBCOMMAND in
+    d|debuggable)
+        if [[ $APK_OPT_SET == true ]]; then
+            echo "Making $BASE_APK_ARG debuggable..."
+            parse_make_apk_debuggable
+        else
+            make_apk_debuggable_from_device "$1"
+        fi
+        exit 0
+        ;;
+    pull)
+        # Verify an argument was provided.
+        if [ -z $1 ]; then
+            echo >&2 "ERROR: No package name provided to pull!"
+            exit 1
+        fi
+
+        # If --apk was set, pull APKs.
+        if [[ $APK_OPT_SET == true ]]; then
+            pull_apks "$1" "$OUT_OPT_ARG"
+        fi
+
+        # If --obb was set, pull OBBs.
+        if [[ $OBB_OPT_SET == true ]]; then
+            pull_obbs "$1" "$OUT_OPT_ARG"
+        fi
+
+        exit 0
+        ;;
+# TODO: support an install action which pushes obbs too?
+#    install)
+#        ;;
+# TODO: support pushing a set of obbs with a given package name
+#    push-obb)
+#        push_obbs $2
+#        ;;
+    *) # undefined - print usage.
+        usage
+        exit 1
+        ;;
+esac
