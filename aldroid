@@ -551,7 +551,7 @@ extract_package_name_from_manifest() {
     PACKAGE_NAME=${PACKAGE_NAME%%\"*}
 
     # Check if we have a valid package name
-    # TODOTODOTODO Guess this makes no sense and we should rather check if it contains any spaces or something
+    # TODO: We only check if the string is not empty here but we should also guard against other cases like spaces in the string
     if [[ ! -z "$PACKAGE_NAME" ]]; then
         EXTRACTED_PACKAGE_NAME=$PACKAGE_NAME
         echo "Extracted package name: ${PACKAGE_NAME}"
