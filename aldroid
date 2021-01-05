@@ -2,6 +2,9 @@
 #
 # aldroid.sh
 #
+#  Created by Max Buck on 1/1/21.
+#  Copyright © 2021 AppLovin Corporation. All rights reserved.
+#
 # This script is used to make APKs debuggable locally or pull an app, make it debuggable and push it pack to the device or pull/push files to an Android device.
 #
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
