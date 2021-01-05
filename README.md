@@ -115,7 +115,7 @@ Steps:
 1. Install apktool if not already installed (brew is recommended) - <https://ibotpeaches.github.io/Apktool/install>
 
     `brew install apktool`
-    
+
 2. Install both the Android SDK Tools and Android Build Tools and make sure they are available in your path
 
 3. Tap into this repository and install this tool:
@@ -124,10 +124,12 @@ Steps:
 
     `brew install aldroid`
 
-4. See Use cases below for more information on usage
+4. See use cases below for more information on usage
 
 #### Use cases
+
 ##### Charlesing an app on the device
+
 usage: `aldroid-running-app`
 
 Assuming you already have the device on your phone but don't know the package name, we can automatically make the running app charlesable with this command.
@@ -136,7 +138,8 @@ It will detect the currently open app and transform it to make it charlesable as
 
 Also supports `--use-aapt2` option to use aapt2 to rebuild.
 
-##### Charlesing an APK send by a developer
+##### Charlesing an APK sent by a developer
+
 usage: `aldroid d --apk <package_name> [options] [splits]`
 
 It will create a charlesable APK at the same location by appending `_debuggable` to its file name.
@@ -148,12 +151,14 @@ Otherwise you will have to install the app either via `adb install <path_to_apk_
 Also supports `--use-aapt2` option to use aapt2 to rebuild.
 
 ##### Pulling APKs and/or OBBs from the device
+
 usage: `aldroid pull [--apk][--obb] [options] <package_name>`
 
 Pulls the APK(s) and/or OBB(s) associated with that package name from the device.
 Set `-o <output_directory>` to set the output directory in which to store the files. Defaults to `/tmp/<package_name>`
 
 ##### Charlesing an app on the play store
+
 usage: `aldroid d [options] <package_name>`
 
 If an app is on the play store and you want to open the mediation debugger or inspect network traffic, all you have to do is install it on your device and call this one command:
