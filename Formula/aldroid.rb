@@ -3,7 +3,7 @@ class Aldroid < Formula
 
     desc "This tool transforms Android APKs to make them debuggable and MITMable/Charlesable"
     homepage "https://github.com/AppLovin/homebrew-Mobile-Tools"
-    url "https://github.com/AppLovin/homebrew-Mobile-Tools/archive/v#{version}.tar.gz"
+    url "https://github.com/AppLovin/homebrew-Mobile-Tools/archive/aldroid-v#{version}.tar.gz"
 
     def install
         bin.install "aldroid"
