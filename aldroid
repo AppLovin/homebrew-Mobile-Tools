@@ -605,8 +605,14 @@ parse_make_apk_debuggable() {
 
     # Install the apks if -i/--install is set
     if [[ $INSTALL_OPT_SET == true ]]; then
+        # Ignore errors since uninstall will fail if the app is not yet installed
+        set +e
+
         # Uninstall the app
         uninstall_package $EXTRACTED_PACKAGE_NAME
+
+        # Exit on any errors
+        set -e
 
         # Install the app
         install_apks $BASE_APK_OUT "${SPLITS[@]}"
