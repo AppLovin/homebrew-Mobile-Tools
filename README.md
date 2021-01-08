@@ -168,6 +168,6 @@ It will pull the *apk(s)* and *obb(s)* from the device, make them charlesable, u
 Assuming you have a link to the google play store like this: http://play.google.com/store/apps/details?id=com.example.app
 
 You can see the package name at the end of the link; in this case `com.example.app`.
-So the command would be: `aldroid-package com.example.app`
+So the command would be: `aldroid d com.example.app`
 
 Also supports `--use-aapt2` option to use aapt2 to rebuild.
