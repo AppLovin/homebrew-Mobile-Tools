@@ -203,8 +203,8 @@ pull_apks() {
         echo "Pulled ${APK_REMOTE_PATH##*/} to $OUTPUT_DIRECTORY/${APK_REMOTE_PATH##*/}"
 
         # Add the saved APKs filename to the array
-        # TODO: split into 2 lines for better readability
-        PULLED_APKS+=("$(basename "$APK_REMOTE_PATH")")
+        APK_REMOTE_BASE_NAME="$(basename "$APK_REMOTE_PATH")"
+        PULLED_APKS+=("$APK_REMOTE_BASE_NAME")
     done <<< "$apks"
 
     if [[ ${#PULLED_APKS[@]} -eq 0 ]]; then
@@ -284,6 +284,7 @@ elif ! grep "debug-overrides" "$INPUT_DIRECTORY/res/xml/network_security_config.
     fi
 
     # Set networkSecurityConfig in the Android Manifest if it is not in the application tag
+    # TODO: we should do this first in case they call their network security config something different from network_security_config.xml then we can extract the name and transform that one instead of creating a new one
     if ! grep -E "<application.*?networkSecurityConfig.*?>" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
         sed -E "s/(<application.*)(>)/\1 android\:networkSecurityConfig=\"@xml\/network_security_config\" \2 /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
         mv "$INPUT_DIRECTORY/AndroidManifest.xml.tmp" "$INPUT_DIRECTORY/AndroidManifest.xml"
@@ -518,7 +519,7 @@ push_obbs() {
 start_app() {
     # Verify an argument was provided
     if [ -z $1 ]; then
-        echo "No package name provided to run_app"
+        echo "No package name provided to start_app"
         exit 1
     fi
 
@@ -739,7 +740,7 @@ case $SUBCOMMAND in
         fi
         exit 0
         ;;
-    pull)
+    p|pull)
         # Verify an argument was provided
         if [ -z $1 ]; then
             echo >&2 "ERROR: No package name provided to pull!"
@@ -761,10 +762,11 @@ case $SUBCOMMAND in
 # TODO: support an install action which pushes obbs too?
 #    install)
 #        ;;
-# TODO: support pushing a set of obbs with a given package name
+# TODO: support pushing a set of obbs with a given package name, to do that push_obbs should accept an optional parameter or the whole obb code needs to be rewritten to no longer need hard coded path for location
 #    push-obb)
 #        push_obbs $2
 #        ;;
+# TODO: support an action to rebuild a folder with apktool and resign it in case manual edits where necessary
     *) # Undefined - print usage
         usage
         exit 1
