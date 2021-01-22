@@ -671,7 +671,7 @@ APK_OPT_SET=false
 OBB_OPT_SET=false
 SPLIT_OPT_SET=false
 INSTALL_OPT_SET=false
-USE_AAPT2=''
+USE_AAPT2='--use-aapt2'
 ALIGN_OPT_SET=false
 
 # Parse options for subcommand
@@ -711,6 +711,9 @@ while getopts "i-:o:" opt; do
                 ;;
             split)
                 SPLIT_OPT_SET=true
+                ;;
+            use-aapt)
+                USE_AAPT2=''
                 ;;
             use-aapt2)
                 USE_AAPT2='--use-aapt2'
