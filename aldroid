@@ -140,11 +140,16 @@ sign_apk() {
     check_keystore
     local debug_keystore=~/.android/debug.keystore
 
-    # Realigns APK so it can be signed
-    echo "Aligning $APK_IN to $APK_OUT..."
-    # -f: overwrite output path if it exists
-    #  4: defines byte-alignment boundaries; must be 4
-    zipalign -f 4 "$APK_IN" "$APK_OUT"
+    # Optionally realign APK
+    if [[ $ALIGN_OPT_SET == true ]]; then
+        echo "Aligning $APK_IN to $APK_OUT..."
+
+        # -f: overwrite output path if it exists
+        #  4: defines byte-alignment boundaries; must be 4
+        zipalign -f 4 "$APK_IN" "$APK_OUT"
+    else
+        cp "$APK_IN" "$APK_OUT"
+    fi
 
     # Signs the APK
     echo "Signing $APK_OUT..."
@@ -658,6 +663,7 @@ OBB_OPT_SET=false
 SPLIT_OPT_SET=false
 INSTALL_OPT_SET=false
 USE_AAPT2=''
+ALIGN_OPT_SET=false
 
 # Parse options for subcommand
 while getopts "i-:o:" opt; do
@@ -702,6 +708,9 @@ while getopts "i-:o:" opt; do
                 ;;
             install)
                 INSTALL_OPT_SET=true
+                ;;
+            align)
+                ALIGN_OPT_SET=true
                 ;;
             *) # Others - print usage
                 usage
