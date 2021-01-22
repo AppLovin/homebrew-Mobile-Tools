@@ -34,6 +34,9 @@ Pull files for given package name.
   -o <output_directory> Directory in which to store the files. Defaults to /tmp/<package_name>
   --apk          Pull apk(s).
   --obb          Pull obb(s).
+
+usage: aldroid start <package_name>
+Starts the app with the given package name on the connected device.
 EOF
 }
 
@@ -757,6 +760,16 @@ case $SUBCOMMAND in
             pull_obbs "$1" "$OUT_OPT_ARG"
         fi
 
+        exit 0
+        ;;
+    s|start)
+        # Verify an argument was provided
+        if [ -z $1 ]; then
+            echo >&2 "ERROR: No package name provided to start!"
+            exit 1
+        fi
+
+        start_app $1
         exit 0
         ;;
 # TODO: support an install action which pushes obbs too?
