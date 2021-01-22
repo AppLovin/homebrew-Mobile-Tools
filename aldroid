@@ -37,6 +37,11 @@ Pull files for given package name.
 
 usage: aldroid start <package_name>
 Starts the app with the given package name on the connected device.
+
+required tools:
+adb - Android Platform Tools, usually located under ~/Library/Android/sdk/platform-tools/adb
+apktool - Apktool, install via 'brew install apktool'
+apksigner - Android Build Tools, usually located under ~/Library/Android/sdk/build-tools/<version>/apksigner
 EOF
 }
 
