@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.2.0
+VERSION=0.2.1
 
 usage() {
     cat <<EOF
