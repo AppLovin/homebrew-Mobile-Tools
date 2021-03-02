@@ -233,38 +233,33 @@ make_decompiled_debuggable() {
         mkdir "$INPUT_DIRECTORY/res/xml"
     fi
 
-    local USES_CLEARTEXT_TRAFFIC=false
+    # Create network_security_config.xml or update it
 
     # Check for usesCleartextTraffic in the Android Manifest
+    # android:usesCleartextTraffic="true" allows cleartext traffic in the whole app but it is ignored when we add the network_security_config.xml
+    # If that option is set add corresponding network_security_config.xml
     if grep "android:usesCleartextTraffic=\"true\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
-        USES_CLEARTEXT_TRAFFIC=true
+        # android:usesCleartextTraffic is true
+        # Create a new network_security_config.xml with all cleartext traffic allowed (this will also overwrite any existing files)
+        cat > "$INPUT_DIRECTORY/res/xml/network_security_config.xml" << EOM
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+<base-config cleartextTrafficPermitted="true">
+</base-config>
+<debug-overrides>
+    <trust-anchors>
+        <certificates src="user" />
+    </trust-anchors>
+</debug-overrides>
+</network-security-config>
+EOM
     fi
-
-    # Create network_security_config.xml or update it
 
     # If the network_security_config.xml does not exist
     if [ ! -f "$INPUT_DIRECTORY/res/xml/network_security_config.xml" ]; then
-        # android:usesCleartextTraffic="true" allows cleartext traffic in the whole app but it is ignored when we add the network_security_config.xml
-        # If that option is set add corresponding network_security_config.xml
-        if grep "android:usesCleartextTraffic=\"true\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
-            # android:usesCleartextTraffic not true or not set
-            # Create a new network_security_config.xml including only the debug override so we don't accidentally fix cleartext issues
-            cat > "$INPUT_DIRECTORY/res/xml/network_security_config.xml" << EOM
-<?xml version="1.0" encoding="utf-8"?>
-<network-security-config>
-    <base-config cleartextTrafficPermitted="true">
-    </base-config>
-    <debug-overrides>
-        <trust-anchors>
-            <certificates src="user" />
-        </trust-anchors>
-    </debug-overrides>
-</network-security-config>
-EOM
-        else
-            # android:usesCleartextTraffic not true or not set
-            # Create a new network_security_config.xml including only the debug override so we don't accidentally fix cleartext issues
-            cat > "$INPUT_DIRECTORY/res/xml/network_security_config.xml" << EOM
+        # android:usesCleartextTraffic not true or not set
+        # Create a new network_security_config.xml including only the debug override so we don't accidentally fix cleartext issues
+        cat > "$INPUT_DIRECTORY/res/xml/network_security_config.xml" << EOM
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <debug-overrides>
@@ -274,11 +269,9 @@ EOM
     </debug-overrides>
 </network-security-config>
 EOM
-        fi
-
     # If the network_security_config.xml already exists and does not contain debug-overrides
     # TODO: technically there could be a case where the pub has overrides that do not include user certs, we should guard against that
-elif ! grep "debug-overrides" "$INPUT_DIRECTORY/res/xml/network_security_config.xml"; then
+    elif ! grep "debug-overrides" "$INPUT_DIRECTORY/res/xml/network_security_config.xml"; then
         # Add debug-overrides to trust user certs
         # New lines are escaped for better readability
         sed -E "s/<\/network-security-config>/\
