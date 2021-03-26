@@ -70,41 +70,6 @@ Tap into the repository and install or upgrade the tool.
 
 ## Tools
 
-### debugapk
-
-This script is used to make an APK debuggable and usable with Charles.
-It will inject a new `network_security_config.xml`, update the Android Manifest with:
-
-`android:debuggable="true"`
-
-`android:name="applovin.sdk.verbose_logging" android:value="true"`
-
-and rebuild and resign the provided APK, placing it in a build directory.
-
-Steps:
-
-1. Install apktool if not already installed (brew is recommended) - <https://ibotpeaches.github.io/Apktool/install>
-
-    `brew install apktool`
-
-2. Check and ensure your `apktool` version is `2.4.1` or higher with:
-
-    `apktool -version`
-
-3. Tap into this repository and install this tool:
-
-    `brew tap AppLovin/homebrew-Mobile-Tools`
-
-    `brew install debugapk`
-
-4. Run the following command from the terminal in the working directory containing the APK:
-
-    `debugapk -i <APK file name> -o`
-
-5. Run the following command to install the rebuilt APK (delete device's previously installed APK).
-
-    `adb install build/<APK file name>`
-
 ### aldroid
 
 This tool is used to interact with Android apps, making them debuggable and useable with Charles.
