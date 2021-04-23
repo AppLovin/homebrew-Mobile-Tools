@@ -8,6 +8,18 @@ check_tool() {
     }
 }
 
+# executes aldroid d on the given package name
+execute_for_package_name() {
+    echo "Currently running package name: $1"
+
+    # Make sure our tool exists
+    check_tool "aldroid"
+
+    # Transform app to make it debuggable and charlesable
+    aldroid d "$@" "$1"
+    exit 0
+}
+
 # Gets the task record of the currently top most ie currently running activity
 # Returns something like this:
 # * TaskRecord{cc501a7 #1584 A=com.example.app U=0 StackId=221 sz=1}
@@ -18,13 +30,21 @@ REGEX="A=(.*) U="
 if [[ $TASK_RECORD =~ $REGEX ]]; then
     # If there is a match, it's stored in BASH_REMATCH[1]
     PACKAGE_NAME=${BASH_REMATCH[1]}
-    echo "Currently running package name: ${PACKAGE_NAME}"
-
-    # Make sure our tool exists
-    check_tool "aldroid"
-
-    # Transform app to make it debuggable and charlesable
-    aldroid d "$@" "${PACKAGE_NAME}"
-else
-    echo "Unable to determine currently running app."
+    execute_for_package_name $PACKAGE_NAME
 fi
+
+
+# On some devices there doesn't seem to be any TaskRecord so we have to fall back on ActivityRecord
+ACTIVITY_RECORD=$(adb shell dumpsys activity activities | grep 'ActivityRecord' | head -1)
+
+# Extract the package name from the returned activity record via regex
+REGEX="{.* (.*)\/"
+if [[ $ACTIVITY_RECORD =~ $REGEX ]]; then
+    # If there is a match, it's stored in BASH_REMATCH[1]
+    PACKAGE_NAME=${BASH_REMATCH[1]}
+    execute_for_package_name $PACKAGE_NAME
+fi
+
+
+echo "Unable to determine currently running app."
+exit 1
