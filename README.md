@@ -77,11 +77,19 @@ It supports split APKs as well as handling OBBs (see Use cases below for detaile
 
 Steps:
 
-1. Install apktool if not already installed (brew is recommended) - <https://ibotpeaches.github.io/Apktool/install>
+1. Install apktool (2.6.0+ recommended) if not already installed (brew is recommended) - <https://ibotpeaches.github.io/Apktool/install>
 
     `brew install apktool`
 
 2. Install both the Android SDK Tools and Android Build Tools and make sure they are available in your path
+
+    Check by running `apksigner`
+    
+    If you get `Unknown command: apksigner`, make sure you have Android SDK Build-Tools in Android Studio under `Tools > SDK Manager`
+    
+    Once that's installed, run this command (with the latest build-tools version):
+    
+    `ln -s ~/Library/Android/sdk/build-tools/31.0.0/apksigner /usr/local/bin/`
 
 3. Tap into this repository and install this tool:
 
