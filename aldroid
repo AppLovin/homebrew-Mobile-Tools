@@ -35,6 +35,10 @@ Pull files for given package name.
   --apk          Pull apk(s).
   --obb          Pull obb(s).
 
+usage: aldroid b[uild] [options] <path_to_decoded_folder>
+Rebuilds a decoded APK using apktool. The final apk will be named "[name of decoded apk]_rebuilt.apk"
+  -o <output_directory> Directory in which to store the files. Defaults to current working directory.
+
 usage: aldroid start <package_name>
 Starts the app with the given package name on the connected device.
 
@@ -794,7 +798,49 @@ case $SUBCOMMAND in
 #    push-obb)
 #        push_obbs $2
 #        ;;
-# TODO: support an action to rebuild a folder with apktool and resign it in case manual edits where necessary
+    b|build)
+        # verify path was provided
+        if [ -z $1 ]; then
+            echo >&2 "ERROR: path to folder to build provided!"
+            exit 1
+        fi
+
+        # Extract name for APK from apktool.yml
+        APK_NAME=$(grep "apkFileName: .*.apk" "$1/apktool.yml")
+        REGEX="apkFileName: (.*).apk"
+        if [[ $APK_NAME =~ $REGEX ]]; then
+            APK_NAME=${BASH_REMATCH[1]}
+        else
+            echo >&2 "ERROR: Unable to get name from apktool.yml!"
+            exit 1
+        fi
+
+        # Set output paths
+        if [[ -z $OUT_OPT_ARG ]]; then
+            # default to just put it in the current working directory
+            APK_OUT="${APK_NAME}_rebuilt.apk"
+        else
+            # Make sure directory exists
+            if [[ ! -d "$OUT_OPT_ARG" ]]; then
+                mkdir "$OUT_OPT_ARG"
+            fi
+
+            # Because of --split and for consistency -o will always be a directory. Combine with name of decoded APK
+            #TODO maybe we want to support a different argument here to be able to set a specific apk name
+            # Get output name
+            APK_OUT="${OUT_OPT_ARG}/${APK_NAME}.apk"
+        fi
+
+
+        # Rebuild it
+        compile_apk "$1"
+
+        # Align and sign it
+        sign_apk "$1/dist/${APK_NAME}.apk" "$APK_OUT"
+
+        echo "Output APK at $APK_OUT"
+        ;;
+
     *) # Undefined - print usage
         usage
         exit 1
