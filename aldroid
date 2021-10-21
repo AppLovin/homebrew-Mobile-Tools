@@ -234,6 +234,27 @@ make_decompiled_debuggable() {
     fi
 
     # Create network_security_config.xml or update it
+    # The pub may have named their networkSecurityConfig.xml something different so we need to grab it
+    local NSC_GREP=$(grep -E "<application.*?networkSecurityConfig=\".*?\".*?>" "$INPUT_DIRECTORY/AndroidManifest.xml")
+
+    # Default name
+    local NSC_NAME="network_security_config"
+    # Since networkSecurityConfig is not defined, set our default in the Android Manifest if it is not in the application tag
+    if [[ -z $NSC_GREP ]]; then
+        sed -E "s/(<application.*)(>)/\1 android\:networkSecurityConfig=\"@xml\/$NSC_NAME\" \2 /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
+        mv "$INPUT_DIRECTORY/AndroidManifest.xml.tmp" "$INPUT_DIRECTORY/AndroidManifest.xml"
+    else
+        # networkSecurityConfig is defined, find the name via regex
+        # First get a narrow match since ~= doesn't support lazy matching and grep doesn't support capture groups...
+        NSC_NARROW_MATCH=$(grep -oE "networkSecurityConfig=\"@xml/.*?\"" <<< "$NSC_GREP")
+
+        # Extract the networkSecurityConfig name from the narrow match
+        REGEX="networkSecurityConfig=\"@xml\/(.*)\""
+        if [[ $NSC_NARROW_MATCH =~ $REGEX ]]; then
+            NSC_NAME=${BASH_REMATCH[1]}
+            echo " Found networkSecurityConfig defined as: $NSC_NAME"
+        fi
+    fi
 
     # Check for usesCleartextTraffic in the Android Manifest
     # android:usesCleartextTraffic="true" allows cleartext traffic in the whole app but it is ignored when we add the network_security_config.xml
@@ -241,7 +262,7 @@ make_decompiled_debuggable() {
     if grep "android:usesCleartextTraffic=\"true\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
         # android:usesCleartextTraffic is true
         # Create a new network_security_config.xml with all cleartext traffic allowed (this will also overwrite any existing files)
-        cat > "$INPUT_DIRECTORY/res/xml/network_security_config.xml" << EOM
+        cat > "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml" << EOM
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
 <base-config cleartextTrafficPermitted="true">
@@ -256,10 +277,10 @@ EOM
     fi
 
     # If the network_security_config.xml does not exist
-    if [ ! -f "$INPUT_DIRECTORY/res/xml/network_security_config.xml" ]; then
+    if [ ! -f "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml" ]; then
         # android:usesCleartextTraffic not true or not set
         # Create a new network_security_config.xml including only the debug override so we don't accidentally fix cleartext issues
-        cat > "$INPUT_DIRECTORY/res/xml/network_security_config.xml" << EOM
+        cat > "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml" << EOM
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <debug-overrides>
@@ -271,7 +292,7 @@ EOM
 EOM
     # If the network_security_config.xml already exists and does not contain debug-overrides
     # TODO: technically there could be a case where the pub has overrides that do not include user certs, we should guard against that
-    elif ! grep "debug-overrides" "$INPUT_DIRECTORY/res/xml/network_security_config.xml"; then
+    elif ! grep "debug-overrides" "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml"; then
         # Add debug-overrides to trust user certs
         # New lines are escaped for better readability
         sed -E "s/<\/network-security-config>/\
@@ -280,15 +301,8 @@ EOM
         <certificates src=\"user\" \/>\
     <\/trust-anchors>\
 <\/debug-overrides>\
-<\/network-security-config>/" "$INPUT_DIRECTORY/res/xml/network_security_config.xml" > "$INPUT_DIRECTORY/res/xml/network_security_config.xml.tmp"
-        mv "$INPUT_DIRECTORY/res/xml/network_security_config.xml.tmp" "$INPUT_DIRECTORY/res/xml/network_security_config.xml"
-    fi
-
-    # Set networkSecurityConfig in the Android Manifest if it is not in the application tag
-    # TODO: we should do this first in case they call their network security config something different from network_security_config.xml then we can extract the name and transform that one instead of creating a new one
-    if ! grep -E "<application.*?networkSecurityConfig.*?>" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
-        sed -E "s/(<application.*)(>)/\1 android\:networkSecurityConfig=\"@xml\/network_security_config\" \2 /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
-        mv "$INPUT_DIRECTORY/AndroidManifest.xml.tmp" "$INPUT_DIRECTORY/AndroidManifest.xml"
+<\/network-security-config>/" "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml" > "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml.tmp"
+        mv "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml.tmp" "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml"
     fi
 
     # Set debuggable in the Android Manifest
