@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.0
+VERSION=0.3.1
 
 usage() {
     cat <<EOF
@@ -209,6 +209,7 @@ pull_apks() {
         # Each line is 'package:' followed by the absolute path to an APK
         # Remove first 8 characters (package:) from start of line
         local APK_REMOTE_PATH="${line:8}"
+        APK_REMOTE_PATH=${APK_REMOTE_PATH//[$'\t\r\n']}
 
         # Pull APK from device and save it in the output directory
         adb pull "$APK_REMOTE_PATH" "$OUTPUT_DIRECTORY"
