@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.1
+VERSION=0.3.2
 
 usage() {
     cat <<EOF
@@ -323,6 +323,18 @@ EOM
     # TODO: make sure it's correctly inside the application tag
     if grep -i "extractNativeLibs=\"false\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
         sed -i "" "s|android:extractNativeLibs=\"false\"|android:extractNativeLibs=\"true\"|g" "$INPUT_DIRECTORY/AndroidManifest.xml"
+    fi
+
+    # Remove android:localeConfig as it's currently causing issues when recompiling
+    if grep -i "android:localeConfig" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+        echo "removing android:localeConfig from AndroidManifest"
+        sed -i "" "s|android:localeConfig=\"@xml\/locales_config\" ||g" "$INPUT_DIRECTORY/AndroidManifest.xml"
+    fi
+    # make locales_config compile by adding android schema
+    # can't just delete it as it's referenced elsewhere
+    if [ -f "$INPUT_DIRECTORY/res/xml/locales_config.xml" ]; then
+        echo "Adding xmlns:android schema to locales_config"
+        sed -i "" "s|<locale-config>|<locale-config xmlns:android=\"http:\/\/schemas.android.com\/apk\/res\/android\">|g" "$INPUT_DIRECTORY/res/xml/locales_config.xml"
     fi
 
     return 0
