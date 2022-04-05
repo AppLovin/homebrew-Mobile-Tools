@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.2
+VERSION=0.3.3
 
 usage() {
     cat <<EOF
@@ -264,7 +264,7 @@ make_decompiled_debuggable() {
     # Check for usesCleartextTraffic in the Android Manifest
     # android:usesCleartextTraffic="true" allows cleartext traffic in the whole app but it is ignored when we add the network_security_config.xml
     # If that option is set add corresponding network_security_config.xml
-    if grep "android:usesCleartextTraffic=\"true\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+    if grep "android:usesCleartextTraffic=\"true\"" "$INPUT_DIRECTORY/AndroidManifest.xml" || $OVERRIDE_NSC ; then
         # android:usesCleartextTraffic is true
         # Create a new network_security_config.xml with all cleartext traffic allowed (this will also overwrite any existing files)
         cat > "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml" << EOM
@@ -307,6 +307,12 @@ EOM
     <\/trust-anchors>\
 <\/debug-overrides>\
 <\/network-security-config>/" "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml" > "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml.tmp"
+        mv "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml.tmp" "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml"
+    # if it exists and has debug-overrides but does not allow user certificates
+    # TODO: improve by handling all these cases more strictly, also maybe with just one pattern if possible
+    elif ! grep '<certificates src=\"user\"' "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml"; then
+        # use tr to translate newlines into carriage returns to have sed run on all lines
+        tr '\n' '\r' < "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml" | sed -E 's|(<debug-overrides>.*<trust-anchors>)(\r *)<|\1\2<certificates src="user"/>\2<|' | tr '\r' '\n' > "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml.tmp"
         mv "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml.tmp" "$INPUT_DIRECTORY/res/xml/$NSC_NAME.xml"
     fi
 
@@ -697,6 +703,7 @@ SPLIT_OPT_SET=false
 INSTALL_OPT_SET=false
 USE_AAPT2='--use-aapt2'
 ALIGN_OPT_SET=false
+OVERRIDE_NSC=false
 
 # Parse options for subcommand
 while getopts "i-:o:" opt; do
@@ -747,6 +754,9 @@ while getopts "i-:o:" opt; do
                 ;;
             align)
                 ALIGN_OPT_SET=true
+                ;;
+            override-nsc)
+                OVERRIDE_NSC=true
                 ;;
             *) # Others - print usage
                 usage
