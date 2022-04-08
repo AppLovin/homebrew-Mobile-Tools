@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.3
+VERSION=0.3.4
 
 usage() {
     cat <<EOF
@@ -398,7 +398,7 @@ install_apks() {
 
     # Install it on the device
     echo "Installing the following APK(s): ${APKS[@]}..."
-    $cmd ${APKS[@]}
+    $cmd --no-incremental ${APKS[@]}
 }
 
 # Uninstalls a package from a device
