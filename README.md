@@ -6,6 +6,12 @@ This repository contains the AppLovin Mobile team's homebrew installable tools.
 
 Note: If your macOS version is below Catalina (10.15), you may be prompted to install xcode command line tools.
 
+Install Homebrew if not already installed:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+```
+
 Tap into the repository with:
 
 ```bash
@@ -90,6 +96,12 @@ Steps:
     Once that's installed, run this command (with the latest build-tools version):
     
     `ln -s ~/Library/Android/sdk/build-tools/31.0.0/apksigner /usr/local/bin/`
+    
+    If you encounter a `Permission denied` error, append `sudo ` to the front of the command.
+    
+    If you are still encountering issues when running `apksigner`, make sure you have **JDK** installed. It can be downloaded from: <https://www.oracle.com/java/technologies/downloads/#jdk18-mac>  
+    For M1 Macs, you will need to download the **Arm 64 DMG Installer**
+    
 
 3. Tap into this repository and install this tool:
 
