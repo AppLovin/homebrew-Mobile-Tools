@@ -95,9 +95,7 @@ Steps:
     
     Once that's installed, run this command (with the latest build-tools version):
     
-    `ln -s ~/Library/Android/sdk/build-tools/31.0.0/apksigner /usr/local/bin/`
-    
-    If you encounter a `Permission denied` error, append `sudo ` to the front of the command.
+    `sudo ln -s ~/Library/Android/sdk/build-tools/31.0.0/apksigner /usr/local/bin/`
     
     If you are still encountering issues when running `apksigner`, make sure you have **JDK** installed. It can be downloaded from: <https://www.oracle.com/java/technologies/downloads/#jdk18-mac>  
     For M1 Macs, you will need to download the **Arm 64 DMG Installer**
