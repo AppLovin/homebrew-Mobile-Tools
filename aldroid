@@ -42,6 +42,9 @@ Rebuilds a decoded APK using apktool. The final apk will be named "[name of deco
 usage: aldroid start <package_name>
 Starts the app with the given package name on the connected device.
 
+usage: aldroid kill <package_name>
+Stops the app with the given package name on the connected device.
+
 required tools:
 adb - Android Platform Tools, usually located under ~/Library/Android/sdk/platform-tools/adb
 apktool - Apktool, install via 'brew install apktool'
@@ -862,6 +865,10 @@ case $SUBCOMMAND in
         sign_apk "$1/dist/${APK_NAME}.apk" "$APK_OUT"
 
         echo "Output APK at $APK_OUT"
+        ;;
+
+    k|kill)
+        adb shell am force-stop $1
         ;;
 
     *) # Undefined - print usage
