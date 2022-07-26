@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.4
+VERSION=0.3.5
 
 usage() {
     cat <<EOF
@@ -28,6 +28,7 @@ Make an apk or a split apk debuggable and charlesable. Saves all inputs as <inpu
   --use-aapt2    Rebuild with aapt2.
   --split        Indicates that this is a split apk and a list of splits follow the options.
   -i|--install   Install the apks after making them debuggable.
+  --pm-install   Install the apk on the device using a pm install session instead of using 'adb install'.
 
 usage: aldroid pull [options] <package_name>
 Pull files for given package name.
@@ -393,6 +394,33 @@ install_apks() {
 
     local APKS=("$@")
 
+    if [[ $USE_PM_INSTALL == true ]]; then
+        CREATE_SESSION=$(adb shell pm install-create)
+        REGEX="Success: created install session \[([0-9]+)\]"
+        if [[ $CREATE_SESSION =~ $REGEX ]]; then
+            SESSION_ID=${BASH_REMATCH[1]}
+            echo "Started install session with session id: $SESSION_ID"
+        else
+            echo >&2 "Unable to start install session"
+            exit 1
+        fi
+
+        for APK in "${APKS[@]}"
+        do
+            BASE_APK_NAME=$(basename "$APK")
+            echo "Pushing $APK to device (/data/local/tmp/$BASE_APK_NAME)"
+            adb push "$APK" "/data/local/tmp/$BASE_APK_NAME"
+
+            echo "Adding $BASE_APK_NAME to install session"
+            adb shell pm install-write $SESSION_ID "$BASE_APK_NAME" "/data/local/tmp/$BASE_APK_NAME"
+        done
+
+        echo "Finalizing install"
+        adb shell pm install-commit $SESSION_ID
+
+        return 0
+    fi
+
     # Determine whether we have more then one APK and run adb install-multiple in that case
     local cmd="adb install"
     if [ ${#APKS[@]} -gt 1 ]; then
@@ -707,6 +735,7 @@ INSTALL_OPT_SET=false
 USE_AAPT2='--use-aapt2'
 ALIGN_OPT_SET=false
 OVERRIDE_NSC=false
+USE_PM_INSTALL=false
 
 # Parse options for subcommand
 while getopts "i-:o:" opt; do
@@ -760,6 +789,9 @@ while getopts "i-:o:" opt; do
                 ;;
             override-nsc)
                 OVERRIDE_NSC=true
+                ;;
+            pm-install)
+                USE_PM_INSTALL=true
                 ;;
             *) # Others - print usage
                 usage
