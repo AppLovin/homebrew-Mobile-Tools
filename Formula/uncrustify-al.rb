@@ -1,4 +1,4 @@
-class UncrustifyAL < Formula
+class UncrustifyAl < Formula
     version "0.1.0"
 
     desc "This is a version of the uncrustify tool built off of that repo's latest master."
