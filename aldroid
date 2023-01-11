@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.6
+VERSION=0.3.7
 
 usage() {
     cat <<EOF
@@ -322,9 +322,9 @@ EOM
 
     # Set debuggable in the Android Manifest
     # TODO: make sure it's correctly inside the application tag
-    if grep -i "debuggable=\"false\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+    if grep -i "android:debuggable=\"false\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
         sed -i "" "s|android:debuggable=\"false\"|android:debuggable=\"true\"|g" "$INPUT_DIRECTORY/AndroidManifest.xml"
-    elif ! grep -i "debuggable" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+    elif ! grep -i "android:debuggable" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
         sed -E "s/(<application.*)(>)/\1 android\:debuggable=\"true\" \2 /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
         mv "$INPUT_DIRECTORY/AndroidManifest.xml.tmp" "$INPUT_DIRECTORY/AndroidManifest.xml"
     fi
