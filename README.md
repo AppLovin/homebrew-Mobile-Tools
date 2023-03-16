@@ -12,6 +12,12 @@ Install Homebrew if not already installed:
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
 
+Tip: Quick one-liner to make the `brew` command accessible in Terminal after running the script above:
+
+```bash
+sudo ln -s /opt/homebrew/bin/brew /usr/local/bin
+```
+
 Tap into the repository with:
 
 ```bash
