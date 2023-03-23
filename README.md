@@ -89,11 +89,17 @@ Steps:
 
 2. Install both the Android SDK Tools and Android Build Tools and make sure they are available in your path
 
-    Check by running `apksigner`
+    2a. Check that you can access adb from command line by running `adb` in Terminal
+    
+    If you see `Unknown command: adb`, run this command:
+    
+    `sudo ln -s ~/Library/Android/sdk/platform-tools/adb /usr/local/bin`
+    
+    2b. Check that you can access apksigner from command line by running `apksigner` in Terminal
     
     If you get `Unknown command: apksigner`, make sure you have Android SDK Build-Tools in Android Studio under `Tools > SDK Manager`
     
-    Once that's installed, run this command (with the latest build-tools version):
+    Once that's installed, run this command (replace `31.0.0` with the latest version in your `~/Library/Android/sdk/build-tools/` directory):
     
     `sudo ln -s ~/Library/Android/sdk/build-tools/31.0.0/apksigner /usr/local/bin/`
     
