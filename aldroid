@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.7
+VERSION=0.3.8
 
 usage() {
     cat <<EOF
@@ -345,6 +345,11 @@ EOM
     if [ -f "$INPUT_DIRECTORY/res/xml/locales_config.xml" ]; then
         echo "Adding xmlns:android schema to locales_config"
         sed -i "" "s|<locale-config>|<locale-config xmlns:android=\"http:\/\/schemas.android.com\/apk\/res\/android\">|g" "$INPUT_DIRECTORY/res/xml/locales_config.xml"
+    fi
+
+    #remove meta data with @null values
+    if grep -iE "<meta-data[^>]+android:resource=\"@null\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
+        sed -E -i "" "s|<meta-data[^>]+android:resource=\"@null\"/>||g" "$INPUT_DIRECTORY/AndroidManifest.xml"
     fi
 
     return 0
