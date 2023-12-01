@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.8
+VERSION=0.3.9
 
 usage() {
     cat <<EOF
@@ -250,7 +250,7 @@ make_decompiled_debuggable() {
     local NSC_NAME="network_security_config"
     # Since networkSecurityConfig is not defined, set our default in the Android Manifest if it is not in the application tag
     if [[ -z $NSC_GREP ]]; then
-        sed -E "s/(<application.*)(>)/\1 android\:networkSecurityConfig=\"@xml\/$NSC_NAME\" \2 /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
+        sed -E "s/(<application)/\1 android\:networkSecurityConfig=\"@xml\/$NSC_NAME\" /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
         mv "$INPUT_DIRECTORY/AndroidManifest.xml.tmp" "$INPUT_DIRECTORY/AndroidManifest.xml"
     else
         # networkSecurityConfig is defined, find the name via regex
@@ -325,7 +325,7 @@ EOM
     if grep -i "android:debuggable=\"false\"" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
         sed -i "" "s|android:debuggable=\"false\"|android:debuggable=\"true\"|g" "$INPUT_DIRECTORY/AndroidManifest.xml"
     elif ! grep -i "android:debuggable" "$INPUT_DIRECTORY/AndroidManifest.xml"; then
-        sed -E "s/(<application.*)(>)/\1 android\:debuggable=\"true\" \2 /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
+        sed -E "s/(<application)/\1 android\:debuggable=\"true\" /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
         mv "$INPUT_DIRECTORY/AndroidManifest.xml.tmp" "$INPUT_DIRECTORY/AndroidManifest.xml"
     fi
 

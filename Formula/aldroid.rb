@@ -1,5 +1,5 @@
 class Aldroid < Formula
-    version "0.3.8"
+    version "0.3.9"
 
     desc "This tool transforms Android APKs to make them debuggable and MITMable/Charlesable"
     homepage "https://github.com/AppLovin/homebrew-Mobile-Tools"
