@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.9
+VERSION=0.3.10
 
 usage() {
     cat <<EOF
@@ -434,7 +434,7 @@ install_apks() {
 
     # Install it on the device
     echo "Installing the following APK(s): ${APKS[@]}..."
-    $cmd --no-incremental ${APKS[@]}
+    $cmd $INCREMENTAL ${APKS[@]}
 }
 
 # Uninstalls a package from a device
@@ -741,6 +741,7 @@ USE_AAPT2='--use-aapt2'
 ALIGN_OPT_SET=false
 OVERRIDE_NSC=false
 USE_PM_INSTALL=false
+INCREMENTAL='--no-incremental'
 
 # Parse options for subcommand
 while getopts "i-:o:" opt; do
@@ -786,6 +787,12 @@ while getopts "i-:o:" opt; do
             use-aapt2)
                 USE_AAPT2='--use-aapt2'
                 ;;
+            no-incremental)
+                INCREMENTAL='--no-incremental'
+                ;;
+            incremental)
+                INCREMENTAL=''
+                ;;
             install)
                 INSTALL_OPT_SET=true
                 ;;
@@ -814,6 +821,8 @@ if [[ -z $SUBCOMMAND ]]; then
     usage
     exit 1
 fi
+
+echo "aldroid v$VERSION"
 
 case $SUBCOMMAND in
     d|debuggable)
