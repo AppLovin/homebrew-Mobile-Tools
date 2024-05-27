@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.10
+VERSION=0.3.11
 
 usage() {
     cat <<EOF
@@ -253,6 +253,15 @@ make_decompiled_debuggable() {
         sed -E "s/(<application)/\1 android\:networkSecurityConfig=\"@xml\/$NSC_NAME\" /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
         mv "$INPUT_DIRECTORY/AndroidManifest.xml.tmp" "$INPUT_DIRECTORY/AndroidManifest.xml"
     else
+        # Make sure that the networkSecurityConfig has android: prefix
+        local NSC_PREFIX_GREP=$(grep -E "<application.*android:networkSecurityConfig=\".*?\".*?>" "$INPUT_DIRECTORY/AndroidManifest.xml")
+
+        # if the networkSecurityConfig is not prefixed with android: replace it
+        if [[ -z $NSC_PREFIX_GREP ]]; then
+            sed -E "s/networkSecurityConfig=/android:networkSecurityConfig=/g" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
+            mv "$INPUT_DIRECTORY/AndroidManifest.xml.tmp" "$INPUT_DIRECTORY/AndroidManifest.xml"
+        fi
+
         # networkSecurityConfig is defined, find the name via regex
         # First get a narrow match since ~= doesn't support lazy matching and grep doesn't support capture groups...
         NSC_NARROW_MATCH=$(grep -oE "networkSecurityConfig=\"@xml/.*?\"" <<< "$NSC_GREP")
