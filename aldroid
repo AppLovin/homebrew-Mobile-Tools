@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.3.11
+VERSION=0.3.12
 
 usage() {
     cat <<EOF
@@ -397,8 +397,22 @@ make_apk_debuggable() {
     # Rebuild it
     compile_apk "$DECOMPIILE_DIRECTORY"
 
-    # Align and sign it
-    sign_apk "${DECOMPIILE_DIRECTORY}/dist/${APK_NAME}.apk" "$APK_OUT"
+    if [[ $USE_FALLBACK_DEBUGGABLE == true ]]; then
+        echo "Using fallback to manually replace AndroidManifest and neteworkSecurityConfig."
+        rm -rf "$DECOMPIILE_DIRECTORY/../uz"
+        rm -rf "$DECOMPIILE_DIRECTORY/../uz0"
+        unzip -q -d "$DECOMPIILE_DIRECTORY/../uz" "$DECOMPIILE_DIRECTORY/../base.apk"
+        unzip -q -d "$DECOMPIILE_DIRECTORY/../uz0" "$DECOMPIILE_DIRECTORY/dist/${APK_NAME}.apk"
+        cp "$DECOMPIILE_DIRECTORY/../uz0/AndroidManifest.xml" "$DECOMPIILE_DIRECTORY/../uz/AndroidManifest.xml"
+        cp "$DECOMPIILE_DIRECTORY/../uz0/res/xml/network_security_config.xml" "$DECOMPIILE_DIRECTORY/../uz/res/xml/network_security_config.xml"
+        pushd "$DECOMPIILE_DIRECTORY/../uz"
+        zip -q -r -n resources.arsc ../test.apk .
+        popd
+        sign_apk "${DECOMPIILE_DIRECTORY}/../test.apk" "$APK_OUT"
+    else
+        # Align and sign it
+        sign_apk "${DECOMPIILE_DIRECTORY}/dist/${APK_NAME}.apk" "$APK_OUT"
+    fi
 }
 
 # Installs an APK or multiple APKs to a device with adb install / adb install-multiple
@@ -751,6 +765,7 @@ ALIGN_OPT_SET=false
 OVERRIDE_NSC=false
 USE_PM_INSTALL=false
 INCREMENTAL='--no-incremental'
+USE_FALLBACK_DEBUGGABLE=false
 
 # Parse options for subcommand
 while getopts "i-:o:" opt; do
@@ -813,6 +828,9 @@ while getopts "i-:o:" opt; do
                 ;;
             pm-install)
                 USE_PM_INSTALL=true
+                ;;
+            fallback)
+                USE_FALLBACK_DEBUGGABLE=true
                 ;;
             *) # Others - print usage
                 usage
