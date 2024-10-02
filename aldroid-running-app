@@ -25,13 +25,17 @@ execute_for_package_name() {
 # Gets the task record of the currently top most ie currently running activity
 # Returns something like this:
 # * TaskRecord{cc501a7 #1584 A=com.example.app U=0 StackId=221 sz=1}
-TASK_RECORD=$(adb shell dumpsys activity activities | grep 'TaskRecord' | head -1)
+TASK_RECORD=$(adb shell dumpsys activity activities | grep '\* Task\(Record\)*{' | head -1)
 
 # Extract the package name from the returned task record via regex
 REGEX="A=(.*) U="
 if [[ $TASK_RECORD =~ $REGEX ]]; then
     # If there is a match, it's stored in BASH_REMATCH[1]
     PACKAGE_NAME=${BASH_REMATCH[1]}
+    REGEX=":(.*)"
+    if [[ $PACKAGE_NAME =~ $REGEX ]]; then
+        PACKAGE_NAME=${BASH_REMATCH[1]}
+    fi
     execute_for_package_name $@ $PACKAGE_NAME
 fi
 
