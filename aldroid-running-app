@@ -16,11 +16,8 @@ execute_for_package_name() {
     check_tool "aldroid"
 
     # Transform app to make it debuggable and charlesable
-    if [[ ! -z "$2" ]]; then
-        aldroid d "$2" "$1"
-    else
-        aldroid d "$1"
-    fi
+    echo "$@"
+    aldroid d "$@"
 
     exit 0
 }
@@ -35,7 +32,7 @@ REGEX="A=(.*) U="
 if [[ $TASK_RECORD =~ $REGEX ]]; then
     # If there is a match, it's stored in BASH_REMATCH[1]
     PACKAGE_NAME=${BASH_REMATCH[1]}
-    execute_for_package_name $PACKAGE_NAME $@
+    execute_for_package_name $@ $PACKAGE_NAME
 fi
 
 
@@ -47,7 +44,7 @@ REGEX="{.* (.*)\/"
 if [[ $ACTIVITY_RECORD =~ $REGEX ]]; then
     # If there is a match, it's stored in BASH_REMATCH[1]
     PACKAGE_NAME=${BASH_REMATCH[1]}
-    execute_for_package_name $PACKAGE_NAME $@
+    execute_for_package_name $@ $PACKAGE_NAME
 fi
 
 
