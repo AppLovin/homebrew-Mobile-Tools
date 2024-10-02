@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.4.0
+VERSION=0.4.1
 
 usage() {
     cat <<EOF
@@ -899,9 +899,19 @@ case $SUBCOMMAND in
         if [ -z $1 ]; then
             echo >&2 "ERROR: please provide input apk!"
             exit 1
-            APK_OUT=$OUT_OPT_ARG
-        elif [[ -n $OUT_OPT_ARG ]]; then
-            if is_out_path_like_file; then
+        fi
+
+        # Strip APK file name of any extension
+        APK_NAME_WITH_EXT=$(basename "$1")
+        APK_NAME="${APK_NAME_WITH_EXT%.*}"
+
+        # Set output paths
+        # defaults to just put it in the current working directory
+        APK_OUT="${APK_NAME}_resigned.apk"
+
+        sign_apk "$1" "$APK_OUT"
+        echo "Signed APK at $APK_OUT"
+        ;;
 # TODO: support an install action which pushes obbs too?
 #    install)
 #        ;;
