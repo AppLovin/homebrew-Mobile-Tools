@@ -216,6 +216,7 @@ pull_apks() {
         APK_REMOTE_PATH=${APK_REMOTE_PATH//[$'\t\r\n']}
 
         # Pull APK from device and save it in the output directory
+        echo "adb pull $APK_REMOTE_PATH $OUTPUT_DIRECTORY"
         adb pull "$APK_REMOTE_PATH" "$OUTPUT_DIRECTORY"
         echo "Pulled ${APK_REMOTE_PATH##*/} to $OUTPUT_DIRECTORY/${APK_REMOTE_PATH##*/}"
 
@@ -398,7 +399,7 @@ make_apk_debuggable() {
     compile_apk "$DECOMPIILE_DIRECTORY"
 
     if [[ $USE_FALLBACK_DEBUGGABLE == true ]]; then
-        echo "Using fallback to manually replace AndroidManifest and neteworkSecurityConfig."
+        echo "Using fallback to manually replace AndroidManifest and networkSecurityConfig."
         rm -rf "$DECOMPIILE_DIRECTORY/../uz"
         rm -rf "$DECOMPIILE_DIRECTORY/../uz0"
         unzip -q -d "$DECOMPIILE_DIRECTORY/../uz" "$DECOMPIILE_DIRECTORY/../base.apk"
@@ -718,7 +719,7 @@ parse_make_apk_debuggable() {
         set -e
 
         # Install the app
-        install_apks $BASE_APK_OUT "${SPLITS[@]}"
+        install_apks "$BASE_APK_OUT" "${SPLITS[@]}"
 
         # Start the app after it has been installed
         start_app "${EXTRACTED_PACKAGE_NAME}"
@@ -936,6 +937,11 @@ case $SUBCOMMAND in
 
         # Align and sign it
         sign_apk "$1/dist/${APK_NAME}.apk" "$APK_OUT"
+
+        # TODO support specifying other APKs that also need to be installed and auto-pickup of numbered apks (ie 1.apk 2.apk etc)
+        if [[ $INSTALL_OPT_SET == true ]]; then
+            install_apks "$APK_OUT"
+        fi
 
         echo "Output APK at $APK_OUT"
         ;;
