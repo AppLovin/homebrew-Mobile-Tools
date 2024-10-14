@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.4.1
+VERSION=0.4.2
 
 usage() {
     cat <<EOF
@@ -251,7 +251,7 @@ make_decompiled_debuggable() {
     local NSC_GREP=$(grep -E "<application.*?networkSecurityConfig=\".*?\".*?>" "$INPUT_DIRECTORY/AndroidManifest.xml")
 
     # Default name
-    local NSC_NAME="network_security_config"
+    NSC_NAME="network_security_config"
     # Since networkSecurityConfig is not defined, set our default in the Android Manifest if it is not in the application tag
     if [[ -z $NSC_GREP ]]; then
         sed -E "s/(<application)/\1 android\:networkSecurityConfig=\"@xml\/$NSC_NAME\" /" "$INPUT_DIRECTORY/AndroidManifest.xml" > "$INPUT_DIRECTORY/AndroidManifest.xml.tmp"
@@ -402,13 +402,18 @@ make_apk_debuggable() {
     compile_apk "$DECOMPIILE_DIRECTORY"
 
     if [[ $USE_FALLBACK_DEBUGGABLE == true ]]; then
+        if [[ -z $NSC_NAME ]]; then
+            NSC_NAME="network_security_config"
+        fi
+        echo "Using $NSC_NAME as nsc name"
+
         echo "Using fallback to manually replace AndroidManifest and networkSecurityConfig."
         rm -rf "$DECOMPIILE_DIRECTORY/../uz"
         rm -rf "$DECOMPIILE_DIRECTORY/../uz0"
         unzip -q -d "$DECOMPIILE_DIRECTORY/../uz" "$DECOMPIILE_DIRECTORY/../base.apk"
         unzip -q -d "$DECOMPIILE_DIRECTORY/../uz0" "$DECOMPIILE_DIRECTORY/dist/${APK_NAME}.apk"
         cp "$DECOMPIILE_DIRECTORY/../uz0/AndroidManifest.xml" "$DECOMPIILE_DIRECTORY/../uz/AndroidManifest.xml"
-        cp "$DECOMPIILE_DIRECTORY/../uz0/res/xml/network_security_config.xml" "$DECOMPIILE_DIRECTORY/../uz/res/xml/network_security_config.xml"
+        cp "$DECOMPIILE_DIRECTORY/../uz0/res/xml/$NSC_NAME.xml" "$DECOMPIILE_DIRECTORY/../uz/res/xml/$NSC_NAME.xml"
         pushd "$DECOMPIILE_DIRECTORY/../uz"
         zip -q -r -n resources.arsc ../test.apk .
         popd
