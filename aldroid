@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.4.2
+VERSION=0.4.3
 
 usage() {
     cat <<EOF
@@ -579,7 +579,7 @@ pull_obbs() {
     fi
 
     # Iterate over all OBBs we found and pull them from the device
-    for OBB in "$TEMP_OBBS"; do
+    while IFS= read -r OBB; do
         # In case there are other files there make sure the obb files end in .obb
         if [[ "${OBB: -4}" != ".obb" ]]; then
             continue
@@ -587,8 +587,8 @@ pull_obbs() {
 
         adb pull "/sdcard/Android/obb/$1/$OBB" "$OUTPUT_DIRECTORY/$OBB"
         echo "Pulled $OBB into $OUTPUT_DIRECTORY/$OBB"
-        OBBS+=$OBB
-    done
+        OBBS+=($OBB)
+    done <<< "$TEMP_OBBS"
 
     return 0
 }
@@ -604,7 +604,6 @@ push_obbs() {
     fi
 
     echo "Pushing OBB(s)..."
-    echo "$OBBS"
 
     # Safety for empty arrays as if it's empty we would push the entire folder
     if [[ ${#OBBS[@]} -eq 0 ]]; then
@@ -612,8 +611,10 @@ push_obbs() {
         return 0
     fi
 
+    echo "${OBBS[@]}"
+
     # Iterate all OBBs on $OBBS and push them back to the device
-    for OBB in "$OBBS"; do
+    for OBB in "${OBBS[@]}"; do
         adb push "/tmp/$1/$OBB" "/sdcard/Android/obb/$1/$OBB"
     done
 
@@ -884,7 +885,11 @@ case $SUBCOMMAND in
 
         # If --obb was set, pull OBBs
         if [[ $OBB_OPT_SET == true ]]; then
-            pull_obbs "$1" "$OUT_OPT_ARG"
+            if [[ -z "$OUT_OPT_ARG" ]]; then
+                pull_obbs "$1"
+            else
+                pull_obbs "$1" "$OUT_OPT_ARG"
+            fi
         fi
 
         exit 0
