@@ -10,7 +10,7 @@
 # Example Usage: ./aldroid.sh d com.applovin.enterprise.apps.demoapp
 #
 
-VERSION=0.4.3
+VERSION=0.4.4
 
 usage() {
     cat <<EOF
@@ -20,12 +20,12 @@ usage: aldroid
 
 usage: aldroid d[ebuggable] [options] <package_name>
 Pulls the app, makes it debuggable and charlesable and reinstalls it. Will also handle obbs.
-  --use-aapt2    Rebuild with aapt2.
+  --use-aapt2    Rebuild with aapt2 (apktool 2.x only; ignored on apktool 3+, which is aapt2-only).
 
 usage: aldroid d[ebuggable] [options] --apk <apk_file> [splits]
 Make an apk or a split apk debuggable and charlesable. Saves all inputs as <input>_debuggable.apk
   -o <output_directory> The directory to save the apks to.
-  --use-aapt2    Rebuild with aapt2.
+  --use-aapt2    Rebuild with aapt2 (apktool 2.x only; ignored on apktool 3+).
   --split        Indicates that this is a split apk and a list of splits follow the options.
   -i|--install   Install the apks after making them debuggable.
   --pm-install   Install the apk on the device using a pm install session instead of using 'adb install'.
@@ -94,6 +94,29 @@ check_apktool() {
     }
 }
 
+# Major version of apktool (e.g. 2 for 2.11.1, 3 for 3.0.1). Non-numeric → 0.
+apktool_major_version() {
+    local ver
+    ver=$(apktool --version 2>/dev/null | head -n1 | cut -d. -f1)
+    case "$ver" in
+        ''|*[!0-9]*) echo 0 ;;
+        *) echo "$ver" ;;
+    esac
+}
+
+# Clears apktool's framework cache before rebuild. apktool 3 renamed
+# empty-framework-dir to clean-frameworks and dropped --force (use --all).
+clean_apktool_framework_cache() {
+    local decode_dir=$1
+    local major
+    major=$(apktool_major_version)
+    if [ "$major" -ge 3 ] 2>/dev/null; then
+        apktool clean-frameworks --all
+    else
+        apktool empty-framework-dir --force "$decode_dir"
+    fi
+}
+
 # Decompiles an apk with apktool
 # First argument is the APK to decompile
 # Second argument is optional and defines the path to the output folder (content will be overwritten if it exists) - defaults to /tmp/<apk_name_without_extensions>
@@ -134,13 +157,11 @@ compile_apk() {
     # Check that apktool is installed
     check_apktool
 
-    # Empty out internal frameworks in the output directory by force deleting the output directory
-    apktool empty-framework-dir --force "$APK_IN"
+    # Clear cached framework APKs so rebuild does not mix stale frameworks.
+    clean_apktool_framework_cache "$APK_IN"
 
-    # Rebuild the apk. Reads $USE_AAPT2 which is set when this script is run with the --use-aapt2 flag
-    # -f:          overwrite output APK if it already exists
-    # --use-aapt2: Use the newer aapt2 to recompile resources which is sometimes required for a successful build
-    # Will always output to APK_IN/dist/base.apk
+    # Rebuild the apk. Reads $USE_AAPT2 (apktool 2.x: optional --use-aapt2; apktool 3+: aapt2-only, flag omitted).
+    # -f: overwrite output APK if it already exists
     apktool b -f $USE_AAPT2 "$APK_IN"
 
     return 0
@@ -860,6 +881,11 @@ if [[ -z $SUBCOMMAND ]]; then
 fi
 
 echo "aldroid v$VERSION"
+
+# apktool 3+ removed --use-aapt2 (always aapt2).
+if [ "$(apktool_major_version)" -ge 3 ] 2>/dev/null; then
+    USE_AAPT2=''
+fi
 
 case $SUBCOMMAND in
     d|debuggable)

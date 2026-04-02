@@ -1,23 +1,23 @@
 #! /usr/bin/env bash
 
-# Checks if a tool exists in path
-check_tool() {
-    command -v $1 >/dev/null 2>&1 || {
-        echo >&2 "ERROR: $1 is not installed!"
-        exit 1
-    }
-}
+# Prefer aldroid beside this script (repo / unpacked copy); otherwise use PATH (e.g. Homebrew).
+_aldroid_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -x "${_aldroid_script_dir}/aldroid" ]]; then
+    ALDROID="${_aldroid_script_dir}/aldroid"
+elif command -v aldroid >/dev/null 2>&1; then
+    ALDROID="aldroid"
+else
+    echo >&2 "ERROR: aldroid is not installed (no sibling script and not on PATH)!"
+    exit 1
+fi
 
 # executes aldroid d on the given package name
 execute_for_package_name() {
     echo "Currently running package name: $1"
 
-    # Make sure our tool exists
-    check_tool "aldroid"
-
     # Transform app to make it debuggable and charlesable
     echo "$@"
-    aldroid d "$@"
+    "$ALDROID" d "$@"
 
     exit 0
 }
